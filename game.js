@@ -1,23 +1,25 @@
 /**
  * PixelJump Engine
- * Version: 1.7.0 (Initials Prompt, Avatar Selection, Top 15 Leaderboard & Knight Kite Shield Graphic)
+ * Version: 1.8.0 (Interactive Character Carousel, Validated Initials & Styled High Score Leaderboard)
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v1.7.0";
+  const GAME_VERSION = "v1.8.0";
   const canvas = document.getElementById('gameCanvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
 
   // ==========================================
-  // 1. STATE & TOP 15 LEADERBOARD
+  // 1. STATE & LEADERBOARD DATA
   // ==========================================
   let score = 0;
   let playerInitials = localStorage.getItem('pixeljump_initials') || "AAA";
   let highScores = JSON.parse(localStorage.getItem('pixeljump_top15')) || [
     { name: "ACE", score: 50 },
     { name: "JMP", score: 35 },
-    { name: "CAT", score: 20 }
+    { name: "CAT", score: 20 },
+    { name: "NEO", score: 15 },
+    { name: "SKY", score: 10 }
   ];
 
   let gameStarted = false;
@@ -97,12 +99,12 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // 3. PLAYER & CHARACTERS
+  // 3. CHARACTERS & SELECTION
   // ==========================================
   const AVATARS = [
-    { id: 'cat', emoji: '🐱', name: 'Cat', color: '#ff9800', src: 'cat.png' },
-    { id: 'rocket', emoji: '🚀', name: 'Rocket', color: '#e91e63', src: 'rocket.png' },
-    { id: 'ghost', emoji: '👻', name: 'Ghost', color: '#9c27b0', src: '' }
+    { id: 'cat', emoji: '🐱', name: 'Cat', color: '#ff9800' },
+    { id: 'rocket', emoji: '🚀', name: 'Rocket', color: '#e91e63' },
+    { id: 'ghost', emoji: '👻', name: 'Ghost', color: '#9c27b0' }
   ];
   let selectedAvatarIndex = 0;
   let customAvatarImg = null;
@@ -120,9 +122,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   const giantShield = {
     active: false,
-    pipesRemaining: 0,
-    scale: 1.0,
-    angle: 0
+    pipesRemaining: 0
   };
 
   let pipes = [];
@@ -130,8 +130,23 @@ window.addEventListener('DOMContentLoaded', () => {
   let particles = [];
   let floatingTexts = [];
 
+  // Strict 1-3 Letter Initials Prompt
+  function promptForInitials() {
+    let input = prompt("Enter your Initials (1 to 3 letters):", playerInitials);
+    if (input !== null) {
+      const sanitized = input.replace(/[^a-zA-Z]/g, '').toUpperCase().trim();
+      if (sanitized.length >= 1 && sanitized.length <= 3) {
+        playerInitials = sanitized;
+        localStorage.setItem('pixeljump_initials', playerInitials);
+      } else {
+        alert("Please enter between 1 and 3 letters!");
+        promptForInitials();
+      }
+    }
+  }
+
   // ==========================================
-  // 4. INPUT & SPLASH SCREEN INTERACTION
+  // 4. INPUT & SPLASH CONTROLS
   // ==========================================
   function handleCanvasClick(e) {
     const rect = canvas.getBoundingClientRect();
@@ -147,25 +162,31 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     if (!gameStarted) {
-      // Initials Click Zone
-      if (clickX >= 110 && clickX <= 290 && clickY >= 180 && clickY <= 220) {
-        let input = prompt("Enter your 3-letter initials:", playerInitials);
-        if (input) {
-          playerInitials = input.toUpperCase().trim().substring(0, 3) || "AAA";
-          localStorage.setItem('pixeljump_initials', playerInitials);
-        }
+      // Initials Box Click Zone (y: 60-100)
+      if (clickX >= 60 && clickX <= 340 && clickY >= 60 && clickY <= 100) {
+        promptForInitials();
         return;
       }
 
-      // Avatar Toggle Click Zone
-      if (clickX >= 110 && clickX <= 290 && clickY >= 235 && clickY <= 275) {
+      // Avatar Previous Arrow Click Zone (y: 110-150, left arrow)
+      if (clickX >= 60 && clickX <= 110 && clickY >= 110 && clickY <= 150) {
+        selectedAvatarIndex = (selectedAvatarIndex - 1 + AVATARS.length) % AVATARS.length;
+        customAvatarImg = null;
+        return;
+      }
+
+      // Avatar Next Arrow Click Zone (y: 110-150, right arrow)
+      if (clickX >= 290 && clickX <= 340 && clickY >= 110 && clickY <= 150) {
         selectedAvatarIndex = (selectedAvatarIndex + 1) % AVATARS.length;
-        customAvatarImg = null; // Reset custom upload when toggling preset avatars
+        customAvatarImg = null;
         return;
       }
 
-      // Start Button Click Zone
-      if (clickX >= 100 && clickX <= 300 && clickY >= 500 && clickY <= 555) {
+      // Start Button Click Zone (y: 500-550)
+      if (clickX >= 80 && clickX <= 320 && clickY >= 500 && clickY <= 550) {
+        if (!playerInitials) {
+          promptForInitials();
+        }
         initAudio();
         gameStarted = true;
         resetGame();
@@ -188,6 +209,7 @@ window.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space' || e.code === 'ArrowUp') {
       if (!gameStarted) {
+        if (!playerInitials) promptForInitials();
         initAudio();
         gameStarted = true;
         resetGame();
@@ -229,7 +251,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==========================================
-  // 5. RANDOMIZED ITEM SPAWNING & COMBOS
+  // 5. ITEM SPAWNING & LEADERBOARD LOGIC
   // ==========================================
   function spawnItem(pipeX, topHeight, gap) {
     if (Math.random() < 0.35) {
@@ -273,7 +295,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function saveHighScore(newScore) {
     highScores.push({ name: playerInitials, score: newScore });
     highScores.sort((a, b) => b.score - a.score);
-    highScores = highScores.slice(0, 15); // Retain top 15
+    highScores = highScores.slice(0, 15);
     localStorage.setItem('pixeljump_top15', JSON.stringify(highScores));
   }
 
@@ -395,7 +417,6 @@ window.addEventListener('DOMContentLoaded', () => {
       if (pipe.shattered) continue;
 
       if (giantShield.active) {
-        // Shield impact zone centered in front of player
         if (pipe.x <= playerCenterX + 65 && pipe.x + pipe.width >= playerCenterX - 30) {
           pipe.shattered = true;
           giantShield.pipesRemaining--;
@@ -435,27 +456,24 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // 7. DRAWING GRAPHICS & KITE SHIELD
+  // 7. RENDERING PIPELINE & STYLED UI
   // ==========================================
   function drawKnightKiteShield(x, y) {
     ctx.save();
     ctx.translate(x, y);
 
-    // Glowing Aura behind shield
     ctx.shadowColor = "#00e676";
     ctx.shadowBlur = 12;
 
-    // Shield Body (Kite Shape)
     ctx.beginPath();
-    ctx.moveTo(0, -35); // Top center
-    ctx.lineTo(25, -35); // Top right
-    ctx.lineTo(22, 5);   // Mid right curve
-    ctx.lineTo(0, 40);   // Bottom point
-    ctx.lineTo(-22, 5);  // Mid left curve
-    ctx.lineTo(-25, -35); // Top left
+    ctx.moveTo(0, -35);
+    ctx.lineTo(25, -35);
+    ctx.lineTo(22, 5);
+    ctx.lineTo(0, 40);
+    ctx.lineTo(-22, 5);
+    ctx.lineTo(-25, -35);
     ctx.closePath();
 
-    // Steel Metallic Gradient Base
     const grad = ctx.createLinearGradient(-25, -35, 25, 40);
     grad.addColorStop(0, '#e0e0e0');
     grad.addColorStop(0.5, '#9e9e9e');
@@ -463,18 +481,15 @@ window.addEventListener('DOMContentLoaded', () => {
     ctx.fillStyle = grad;
     ctx.fill();
 
-    // Gold Outer Rim Border
     ctx.lineWidth = 3;
     ctx.strokeStyle = '#ffd700';
     ctx.stroke();
 
-    // Inner Metallic Cross Emblem
     ctx.shadowBlur = 0;
-    ctx.fillStyle = '#b71c1c'; // Crimson Shield Cross
+    ctx.fillStyle = '#b71c1c';
     ctx.fillRect(-4, -30, 8, 60);
     ctx.fillRect(-20, -15, 40, 8);
 
-    // Center Gold Boss / Stud
     ctx.beginPath();
     ctx.arc(0, -11, 5, 0, Math.PI * 2);
     ctx.fillStyle = '#ffd700';
@@ -484,6 +499,54 @@ window.addEventListener('DOMContentLoaded', () => {
     ctx.stroke();
 
     ctx.restore();
+  }
+
+  // Render Top 10 High Score Table Card
+  function drawLeaderboardCard(startY, title) {
+    const width = 340;
+    const height = 310;
+    const x = (canvas.width - width) / 2;
+
+    // Dark Glass Panel
+    ctx.fillStyle = "rgba(20, 20, 25, 0.9)";
+    ctx.fillRect(x, startY, width, height);
+    ctx.strokeStyle = "rgba(255, 215, 0, 0.5)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, startY, width, height);
+
+    // Title Header
+    ctx.fillStyle = "#ffd700";
+    ctx.font = "bold 16px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(title, canvas.width / 2, startY + 28);
+
+    // Columns
+    const displayScores = highScores.slice(0, 10); // Display Top 10 clearly
+    let rowY = startY + 58;
+
+    displayScores.forEach((hs, idx) => {
+      ctx.font = "bold 14px sans-serif";
+
+      // Rank & Colors
+      if (idx === 0) ctx.fillStyle = "#ffd700"; // 🥇 Gold
+      else if (idx === 1) ctx.fillStyle = "#e0e0e0"; // 🥈 Silver
+      else if (idx === 2) ctx.fillStyle = "#cd7f32"; // 🥉 Bronze
+      else ctx.fillStyle = "#b0bec5";
+
+      // Rank Text
+      ctx.textAlign = "left";
+      ctx.fillText(`#${idx + 1}`, x + 25, rowY);
+
+      // Player Name
+      ctx.fillStyle = (hs.name === playerInitials) ? "#00e676" : "#ffffff";
+      ctx.fillText(hs.name, x + 85, rowY);
+
+      // Score Text
+      ctx.textAlign = "right";
+      ctx.fillText(`${hs.score} pts`, x + width - 25, rowY);
+
+      rowY += 24;
+    });
   }
 
   function draw() {
@@ -531,7 +594,7 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.restore();
     });
 
-    // Player Rendering
+    // Player Avatar Rendering
     const currentAvatar = AVATARS[selectedAvatarIndex];
     if (customAvatarImg) {
       ctx.drawImage(customAvatarImg, player.x, player.y, player.width, player.height);
@@ -558,7 +621,7 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.restore();
     }
 
-    // DRAW ACTUAL KNIGHT'S KITE SHIELD WHEN ACTIVE
+    // Knight Kite Shield Rampage
     if (giantShield.active) {
       drawKnightKiteShield(player.x + player.width + 22, player.y + player.height / 2);
     }
@@ -597,101 +660,80 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // START SPLASH SCREEN & TOP 15 LEADERBOARD
+    // START SPLASH SCREEN WITH INTERACTIVE CONTROLS
     // ==========================================
     if (!gameStarted) {
-      ctx.fillStyle = "rgba(0, 0, 0, 0.82)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 30px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("PIXEL JUMP", canvas.width / 2, 45);
-
-      // Interactive Setup Box
-      ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
-      ctx.fillRect(110, 65, 180, 40);
-      ctx.strokeStyle = "#ffd700";
-      ctx.strokeRect(110, 65, 180, 40);
-
-      ctx.fillStyle = "#ffd700";
-      ctx.font = "bold 14px sans-serif";
-      ctx.fillText(`INITIALS: ${playerInitials} (Tap Change)`, canvas.width / 2, 90);
-
-      ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
-      ctx.fillRect(110, 115, 180, 40);
-      ctx.strokeStyle = "#00e676";
-      ctx.strokeRect(110, 115, 180, 40);
-
-      ctx.fillStyle = "#00e676";
-      ctx.fillText(`AVATAR: ${customAvatarImg ? 'Custom 📁' : currentAvatar.emoji + ' ' + currentAvatar.name}`, canvas.width / 2, 140);
-
-      // Leaderboard Title
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 16px sans-serif";
-      ctx.fillText("🏆 TOP 15 LEADERBOARD 🏆", canvas.width / 2, 180);
-
-      // Leaderboard Rows
-      ctx.font = "13px monospace";
-      let startY = 205;
-      const displayScores = highScores.slice(0, 15);
-      
-      displayScores.forEach((hs, idx) => {
-        const col = idx < 8 ? 60 : 230;
-        const rowY = startY + (idx % 8) * 22;
-        ctx.textAlign = "left";
-        ctx.fillStyle = idx === 0 ? "#ffd700" : (idx === 1 ? "#c0c0c0" : (idx === 2 ? "#cd7f32" : "#ffffff"));
-        ctx.fillText(`${idx + 1}. ${hs.name} - ${hs.score}`, col, rowY);
-      });
-
-      // Start Button
-      ctx.textAlign = "center";
-      ctx.fillStyle = "#2e7d32";
-      ctx.fillRect(100, 480, 200, 50);
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(100, 480, 200, 50);
-
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 18px sans-serif";
-      ctx.fillText("TAP TO START", canvas.width / 2, 512);
-
-      ctx.textAlign = "left";
-    }
-
-    // ==========================================
-    // GAME OVER OVERLAY & LEADERBOARD
-    // ==========================================
-    if (gameOver) {
       ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 28px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("GAME OVER", canvas.width / 2, 50);
+      ctx.fillText("PIXEL JUMP", canvas.width / 2, 42);
 
-      ctx.font = "16px sans-serif";
-      ctx.fillText(`Final Score (${playerInitials}): ${score}`, canvas.width / 2, 80);
+      // Interactive Initials Box
+      ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+      ctx.fillRect(60, 60, 280, 40);
+      ctx.strokeStyle = "#ffd700";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(60, 60, 280, 40);
 
       ctx.fillStyle = "#ffd700";
-      ctx.font = "bold 16px sans-serif";
-      ctx.fillText("TOP 15 HIGH SCORES", canvas.width / 2, 120);
+      ctx.font = "bold 14px sans-serif";
+      ctx.fillText(`INITIALS: [ ${playerInitials} ] (Tap to Change)`, canvas.width / 2, 85);
 
-      ctx.font = "13px monospace";
-      let startY = 145;
-      highScores.slice(0, 15).forEach((hs, idx) => {
-        const col = idx < 8 ? 60 : 230;
-        const rowY = startY + (idx % 8) * 22;
-        ctx.textAlign = "left";
-        ctx.fillStyle = idx === 0 ? "#ffd700" : "#ffffff";
-        ctx.fillText(`${idx + 1}. ${hs.name} - ${hs.score}`, col, rowY);
-      });
+      // Interactive Avatar Carousel Box
+      ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+      ctx.fillRect(60, 110, 280, 40);
+      ctx.strokeStyle = "#00e676";
+      ctx.strokeRect(60, 110, 280, 40);
 
-      ctx.textAlign = "center";
+      ctx.fillStyle = "#00e676";
+      ctx.font = "bold 15px sans-serif";
+      ctx.fillText("◀", 85, 135);
+      ctx.fillText(`AVATAR: ${customAvatarImg ? 'Custom Image 📁' : currentAvatar.emoji + ' ' + currentAvatar.name}`, canvas.width / 2, 135);
+      ctx.fillText("▶", 315, 135);
+
+      // High Score Table
+      drawLeaderboardCard(165, "🏆 HALL OF FAME 🏆");
+
+      // Start Button
+      ctx.fillStyle = "#2e7d32";
+      ctx.fillRect(80, 495, 240, 52);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(80, 495, 240, 52);
+
       ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 18px sans-serif";
+      ctx.fillText("TAP TO START", canvas.width / 2, 528);
+
+      ctx.textAlign = "left";
+    }
+
+    // ==========================================
+    // GAME OVER OVERLAY WITH CLEAR LEADERBOARD
+    // ==========================================
+    if (gameOver) {
+      ctx.fillStyle = "rgba(0, 0, 0, 0.88)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = "#ff5252";
+      ctx.font = "bold 28px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("GAME OVER", canvas.width / 2, 45);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "15px sans-serif";
+      ctx.fillText(`Final Score (${playerInitials}): ${score} pts`, canvas.width / 2, 72);
+
+      // Styled Leaderboard Card
+      drawLeaderboardCard(90, "🏅 TOP SCORES LEADERBOARD 🏅");
+
+      ctx.fillStyle = "#00e676";
       ctx.font = "bold 16px sans-serif";
-      ctx.fillText("Tap Screen or Press Space to Restart", canvas.width / 2, 520);
+      ctx.textAlign = "center";
+      ctx.fillText("Tap Screen or Press Space to Play Again", canvas.width / 2, 530);
       ctx.textAlign = "left";
     }
   }
