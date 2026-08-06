@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>PixelJump - v1.11.0</title>
+  <title>PixelJump - v1.12.0</title>
   <style>
     * {
       box-sizing: border-box;
@@ -16,9 +16,9 @@
     html, body {
       width: 100%;
       height: 100%;
-      background-color: #121212;
-      color: #ffffff;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -29,54 +29,57 @@
     #game-container {
       position: relative;
       width: 100%;
-      max-width: 420px;
-      max-height: 85vh;
-      aspect-ratio: 2 / 3;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
-      border-radius: 12px;
+      max-width: 500px;
+      height: 90vh;
+      max-height: 850px;
+      aspect-ratio: 9 / 16;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 20px rgba(16, 185, 129, 0.2);
+      border-radius: 16px;
       overflow: hidden;
       display: flex;
       justify-content: center;
       align-items: center;
-      background-color: #000;
+      background-color: #020617;
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
     canvas {
       width: 100%;
       height: 100%;
       display: block;
-      background-color: #70c5ce;
+      background-color: #38bdf8;
       object-fit: contain;
     }
     .ui-panel {
-      margin-top: 10px;
+      margin-top: 12px;
       display: flex;
-      gap: 10px;
+      gap: 12px;
       align-items: center;
       justify-content: center;
       flex-wrap: wrap;
     }
     button, label.btn {
-      background: #2e7d32;
+      background: #059669;
       color: white;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 8px 16px;
+      border-radius: 8px;
       cursor: pointer;
-      font-weight: bold;
-      font-size: 12px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      transition: background 0.2s;
+      font-weight: 600;
+      font-size: 13px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      transition: all 0.2s ease;
     }
     button:hover, label.btn:hover {
-      background: #388e3c;
+      background: #10b981;
+      transform: translateY(-1px);
     }
     input[type="file"] {
       display: none;
     }
     .instructions {
-      margin-top: 6px;
-      font-size: 11px;
-      color: #aaa;
+      margin-top: 8px;
+      font-size: 12px;
+      color: #94a3b8;
       text-align: center;
     }
   </style>
@@ -84,19 +87,19 @@
 <body>
 
   <div id="game-container">
-    <canvas id="gameCanvas" width="400" height="600"></canvas>
+    <canvas id="gameCanvas" width="450" height="750"></canvas>
   </div>
 
   <div class="ui-panel">
-    <button id="audioToggle">🔊 Mute Audio</button>
+    <button id="audioToggle">🔊 Audio: On</button>
     <label for="avatarUpload" class="btn">📁 Custom Avatar</label>
     <input type="file" id="avatarUpload" accept="image/*">
   </div>
 
   <div class="instructions">
-    <p>Starts with 🛡️ <strong>Shield</strong>! Grab ⏳ <strong>Slow Time</strong>, 💎 <strong>Gem Multiplier</strong>, or ⚔️ <strong>Sword</strong> for Knight Rampage!</p>
+    <p>Starts with 🛡️ <strong>Shield</strong>! Grab ⏱️ <strong>Chrono Pulse</strong>, 💎 <strong>Gem Multiplier</strong>, or ⚔️ <strong>Sword</strong> for Knight Rampage!</p>
   </div>
 
-  <script src="game.js?v=1.11.0"></script>
+  <script src="game.js?v=1.12.0"></script>
 </body>
 </html>
