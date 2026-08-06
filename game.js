@@ -1,19 +1,22 @@
 /**
  * PixelJump Engine
- * Version: 1.12.0 (iPad Responsive, Timestamp Leaderboards, Chrono Pulse Powerup, 8 Characters & Sleek UI)
+ * Version: 1.13.0 (In-Box Initials Typing, Clean Gameplay HUD, Double Shield Stacking & End-Screen Customization)
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v1.12.0";
+  const GAME_VERSION = "v1.13.0";
   const canvas = document.getElementById('gameCanvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
+  const avatarFileInput = document.getElementById('avatarUpload');
 
   // ==========================================
   // 1. STATE & LEADERBOARD DATA
   // ==========================================
   let score = 0;
-  let playerInitials = localStorage.getItem('pixeljump_initials') || ""; 
+  let playerInitials = localStorage.getItem('pixeljump_initials') || "ACE";
+  let isEditingInitials = false;
+
   let highScores = JSON.parse(localStorage.getItem('pixeljump_top15_v2')) || [
     { name: "ACE", score: 50, date: "Aug 02, 14:20" },
     { name: "JMP", score: 35, date: "Aug 03, 09:15" },
@@ -127,7 +130,8 @@ window.addEventListener('DOMContentLoaded', () => {
     vy: 0,
     gravity: 0.36,
     jumpStrength: -7.2,
-    inventory: { shield: true, sword: false }
+    shieldCount: 1, // Double shield stacking supported (1 or 2)
+    inventory: { sword: false }
   };
 
   const giantShield = {
@@ -150,28 +154,18 @@ window.addEventListener('DOMContentLoaded', () => {
     return `${month} ${day}, ${hours}:${mins}`;
   }
 
-  function promptForInitials() {
-    let input = prompt("Required: Enter your Initials (1 to 3 letters):", playerInitials || "");
-    if (input !== null) {
-      const sanitized = input.replace(/[^a-zA-Z]/g, '').toUpperCase().trim();
-      if (sanitized.length >= 1 && sanitized.length <= 3) {
-        playerInitials = sanitized;
-        localStorage.setItem('pixeljump_initials', playerInitials);
-        return true;
-      } else {
-        alert("Initials are required! Please enter 1 to 3 letters.");
-        return promptForInitials();
-      }
+  avatarFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const img = new Image();
+        img.onload = () => { customAvatarImg = img; };
+        img.src = evt.target.result;
+      };
+      reader.readAsDataURL(file);
     }
-    return false;
-  }
-
-  function ensureInitialsSet() {
-    if (!playerInitials || playerInitials.trim().length === 0) {
-      return promptForInitials();
-    }
-    return true;
-  }
+  });
 
   // ==========================================
   // 4. INPUT & CLICK HANDLING
@@ -195,35 +189,40 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     if (!gameStarted) {
-      // Info Guide Button Zone (y: 15-55, right side)
-      if (clickX >= 320 && clickX <= 430 && clickY >= 15 && clickY <= 55) {
-        showInfoModal = true;
+      // Direct In-Box Initials Click Box (y: 65 - 110)
+      if (clickX >= 50 && clickX <= 400 && clickY >= 65 && clickY <= 110) {
+        isEditingInitials = true;
+        playerInitials = "";
         return;
+      } else {
+        isEditingInitials = false;
+        if (playerInitials.trim().length === 0) playerInitials = "ACE";
       }
 
-      // Initials Box Zone (y: 80-130)
-      if (clickX >= 50 && clickX <= 400 && clickY >= 80 && clickY <= 130) {
-        promptForInitials();
-        return;
-      }
-
-      // Avatar Selector Left Arrow Zone (y: 140-190)
-      if (clickX >= 50 && clickX <= 100 && clickY >= 140 && clickY <= 190) {
+      // Avatar Selector Left Arrow Zone (y: 120 - 165)
+      if (clickX >= 50 && clickX <= 96 && clickY >= 120 && clickY <= 165) {
         selectedAvatarIndex = (selectedAvatarIndex - 1 + AVATARS.length) % AVATARS.length;
         customAvatarImg = null;
         return;
       }
 
-      // Avatar Selector Right Arrow Zone (y: 140-190)
-      if (clickX >= 350 && clickX <= 400 && clickY >= 140 && clickY <= 190) {
+      // Avatar Selector Right Arrow Zone (y: 120 - 165)
+      if (clickX >= 354 && clickX <= 400 && clickY >= 120 && clickY <= 165) {
         selectedAvatarIndex = (selectedAvatarIndex + 1) % AVATARS.length;
         customAvatarImg = null;
         return;
       }
 
-      // Start Button Click Zone (y: 650-710)
-      if (clickX >= 80 && clickX <= 370 && clickY >= 650 && clickY <= 710) {
-        if (!ensureInitialsSet()) return;
+      // How to Play Guide Button (y: 650-695 left)
+      if (clickX >= 50 && clickX <= 215 && clickY >= 650 && clickY <= 695) {
+        showInfoModal = true;
+        return;
+      }
+
+      // Start Game Button (y: 650-695 right)
+      if (clickX >= 235 && clickX <= 400 && clickY >= 650 && clickY <= 695) {
+        if (!playerInitials || playerInitials.trim().length === 0) playerInitials = "ACE";
+        localStorage.setItem('pixeljump_initials', playerInitials);
         initAudio();
         gameStarted = true;
         resetGame();
@@ -233,15 +232,27 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     if (gameOver) {
-      // Game Over: Main Menu Home Button (y: 660-710, left)
-      if (clickX >= 45 && clickX <= 215 && clickY >= 660 && clickY <= 710) {
+      // Audio Toggle Button (y: 645-685, Left)
+      if (clickX >= 40 && clickX <= 215 && clickY >= 645 && clickY <= 685) {
+        audioMuted = !audioMuted;
+        return;
+      }
+
+      // Upload Custom Avatar Button (y: 645-685, Right)
+      if (clickX >= 235 && clickX <= 410 && clickY >= 645 && clickY <= 685) {
+        avatarFileInput.click();
+        return;
+      }
+
+      // Main Menu Home Button (y: 695-735, Left)
+      if (clickX >= 40 && clickX <= 215 && clickY >= 695 && clickY <= 735) {
         gameStarted = false;
         gameOver = false;
         return;
       }
 
-      // Game Over: Play Again Button (y: 660-710, right)
-      if (clickX >= 235 && clickX <= 405 && clickY >= 660 && clickY <= 710) {
+      // Play Again Button (y: 695-735, Right)
+      if (clickX >= 235 && clickX <= 410 && clickY >= 695 && clickY <= 735) {
         resetGame();
         return;
       }
@@ -254,14 +265,33 @@ window.addEventListener('DOMContentLoaded', () => {
     playSound('jump');
   }
 
+  // Keyboard Typing directly for Initials & Control
   window.addEventListener('keydown', (e) => {
+    if (!gameStarted && isEditingInitials) {
+      if (e.key === 'Backspace') {
+        playerInitials = playerInitials.slice(0, -1);
+        return;
+      }
+      if (e.key === 'Enter') {
+        isEditingInitials = false;
+        if (playerInitials.trim().length === 0) playerInitials = "ACE";
+        localStorage.setItem('pixeljump_initials', playerInitials);
+        return;
+      }
+      if (/^[a-zA-Z]$/.test(e.key) && playerInitials.length < 3) {
+        playerInitials += e.key.toUpperCase();
+        return;
+      }
+    }
+
     if (e.code === 'Space' || e.code === 'ArrowUp') {
       if (showInfoModal) {
         showInfoModal = false;
         return;
       }
       if (!gameStarted) {
-        if (!ensureInitialsSet()) return;
+        if (!playerInitials || playerInitials.trim().length === 0) playerInitials = "ACE";
+        localStorage.setItem('pixeljump_initials', playerInitials);
         initAudio();
         gameStarted = true;
         resetGame();
@@ -282,24 +312,6 @@ window.addEventListener('DOMContentLoaded', () => {
   canvas.addEventListener('mousedown', (e) => {
     e.preventDefault();
     handleCanvasClick(e);
-  });
-
-  document.getElementById('audioToggle').addEventListener('click', () => {
-    audioMuted = !audioMuted;
-    document.getElementById('audioToggle').innerText = audioMuted ? '🔇 Audio: Off' : '🔊 Audio: On';
-  });
-
-  document.getElementById('avatarUpload').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const img = new Image();
-        img.onload = () => { customAvatarImg = img; };
-        img.src = evt.target.result;
-      };
-      reader.readAsDataURL(file);
-    }
   });
 
   // ==========================================
@@ -331,8 +343,14 @@ window.addEventListener('DOMContentLoaded', () => {
     playSound('item');
 
     if (type === 'shield') {
-      player.inventory.shield = true;
-      spawnFloatingText("GOT SHIELD!", player.x, player.y - 15, "#10b981");
+      if (player.shieldCount < 2) {
+        player.shieldCount++;
+        const msg = player.shieldCount === 2 ? "DOUBLE SHIELD x2! 🛡️🛡️" : "GOT SHIELD! 🛡️";
+        spawnFloatingText(msg, player.x, player.y - 15, "#10b981");
+      } else {
+        score += 5;
+        spawnFloatingText("MAX SHIELD (+5 PTS)", player.x, player.y - 15, "#10b981");
+      }
     } else if (type === 'sword') {
       player.inventory.sword = true;
       spawnFloatingText("GOT SWORD!", player.x, player.y - 15, "#facc15");
@@ -344,13 +362,13 @@ window.addEventListener('DOMContentLoaded', () => {
       spawnFloatingText("💎 2X POINTS!", player.x, player.y - 15, "#c084fc");
     }
 
-    if (player.inventory.shield && player.inventory.sword) {
+    if (player.shieldCount > 0 && player.inventory.sword) {
       triggerGiantShieldCombo();
     }
   }
 
   function triggerGiantShieldCombo() {
-    player.inventory.shield = false;
+    player.shieldCount = 0;
     player.inventory.sword = false;
 
     giantShield.active = true;
@@ -362,7 +380,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function saveHighScore(newScore) {
-    const validName = playerInitials || "AAA";
+    const validName = playerInitials || "ACE";
     const timestamp = getFormattedTimestamp();
     highScores.push({ name: validName, score: newScore, date: timestamp });
     highScores.sort((a, b) => b.score - a.score);
@@ -526,11 +544,12 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function handlePlayerHit() {
-    if (player.inventory.shield) {
-      player.inventory.shield = false;
+    if (player.shieldCount > 0) {
+      player.shieldCount--;
       player.vy = player.jumpStrength;
       playSound('shatter');
-      spawnFloatingText("SHIELD ABSORBED HIT!", player.x - 20, player.y - 20, "#10b981");
+      const remText = player.shieldCount > 0 ? "1 SHIELD REMAINING!" : "SHIELD BROKEN!";
+      spawnFloatingText(remText, player.x - 20, player.y - 20, "#10b981");
     } else {
       endGame();
     }
@@ -619,20 +638,17 @@ window.addEventListener('DOMContentLoaded', () => {
       else if (idx === 2) ctx.fillStyle = "#fb923c";
       else ctx.fillStyle = "#94a3b8";
 
-      // Rank & Initials
       ctx.textAlign = "left";
       ctx.fillText(`#${idx + 1}`.padEnd(5, ' '), x + 16, rowY);
 
       ctx.fillStyle = (hs.name === playerInitials) ? "#10b981" : "#f8fafc";
       ctx.fillText(hs.name, x + 68, rowY);
 
-      // Date & Time
       ctx.fillStyle = "#94a3b8";
       ctx.font = "11px -apple-system, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(hs.date || "Aug 05, --:--", x + width / 2 + 20, rowY);
 
-      // Score
       ctx.fillStyle = "#facc15";
       ctx.font = "600 13px -apple-system, sans-serif";
       ctx.textAlign = "right";
@@ -642,7 +658,7 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Information & Upgrade Guide Overlay Modal
+  // Information Overlay Guide
   function drawInfoModal() {
     ctx.fillStyle = "rgba(2, 6, 23, 0.94)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -667,10 +683,10 @@ window.addEventListener('DOMContentLoaded', () => {
     let textY = y + 80;
 
     const sections = [
-      { icon: "🛡️", title: "Aura Shield (Default)", body: "Absorbs 1 collision hit from a pipe or ground. Grants a second chance!" },
-      { icon: "⏱️", title: "Chrono Pulse", body: "Slows pipe game speed by 50% for 8 seconds for precision navigation." },
+      { icon: "🛡️", title: "Aura Shield (Double Stacking)", body: "Absorbs 1 collision hit. Grab a 2nd shield to stack a double barrier (🛡️ x2)!" },
+      { icon: "⏱️", title: "Chrono Pulse", body: "Slows pipe movement speed by 50% for 8 seconds for precision dodging." },
       { icon: "💎", title: "Gem Multiplier", body: "Doubles all points earned for passing pipes while active!" },
-      { icon: "⚔️", title: "Sword Pickup", body: "Collect alongside your Shield to activate Knight Rampage." },
+      { icon: "⚔️", title: "Sword Pickup", body: "Collect alongside active Shield to trigger Knight Rampage." },
       { icon: "🛡️+⚔️", title: "Knight's Aegis Rampage", body: "Summons the Knight Kite Shield to smash 6 consecutive pipes for +50 bonus pts!" }
     ];
 
@@ -773,8 +789,8 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.fillText(currentAvatar.emoji, player.x + 8, player.y + 27);
     }
 
-    // Shield Aura
-    if (player.inventory.shield && !giantShield.active) {
+    // Shield Aura Rendering (Layered for Double Shields)
+    if (player.shieldCount > 0 && !giantShield.active) {
       ctx.save();
       ctx.beginPath();
       ctx.arc(player.x + player.width / 2, player.y + player.height / 2, player.width / 2 + 7, 0, Math.PI * 2);
@@ -783,6 +799,15 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.strokeStyle = "#10b981";
       ctx.lineWidth = 2;
       ctx.stroke();
+
+      // Outer Layer Ring for Double Shield
+      if (player.shieldCount >= 2) {
+        ctx.beginPath();
+        ctx.arc(player.x + player.width / 2, player.y + player.height / 2, player.width / 2 + 13, 0, Math.PI * 2);
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+      }
       ctx.restore();
     }
 
@@ -801,7 +826,7 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.restore();
     });
 
-    // HUD
+    // HUD (Cleaned of custom avatar/audio buttons)
     ctx.fillStyle = "#ffffff";
     ctx.font = "600 20px -apple-system, sans-serif";
     ctx.fillText(`Score: ${score}`, 20, 35);
@@ -813,8 +838,8 @@ window.addEventListener('DOMContentLoaded', () => {
     ctx.fillText(GAME_VERSION, canvas.width - 65, 24);
 
     let hudY = 78;
-    let invStatus = "Inventory: ";
-    if (player.inventory.shield) invStatus += "🛡️ ";
+    let invStatus = "Shields: ";
+    if (player.shieldCount > 0) invStatus += `🛡️ x${player.shieldCount} `;
     if (player.inventory.sword) invStatus += "⚔️ ";
     ctx.font = "14px -apple-system, sans-serif";
     ctx.fillText(invStatus, 20, hudY);
@@ -839,141 +864,168 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // SPLASH SCREEN WITH SLEEK DARK THEME
+    // MAIN SPLASH MENU
     // ==========================================
     if (!gameStarted) {
-      ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+      ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.fillStyle = "#f8fafc";
       ctx.font = "bold 32px -apple-system, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("PIXEL JUMP", canvas.width / 2, 50);
+      ctx.fillText("PIXEL JUMP", canvas.width / 2, 45);
 
-      // Info Guide Icon Button (Top Right)
-      ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-      ctx.fillRect(320, 15, 110, 38);
-      ctx.strokeStyle = "#10b981";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(320, 15, 110, 38);
-      ctx.fillStyle = "#10b981";
-      ctx.font = "600 13px -apple-system, sans-serif";
-      ctx.fillText("🧭 Guide", 375, 39);
-
-      // Interactive Initials Box
-      ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-      ctx.fillRect(50, 80, 350, 48);
-      ctx.strokeStyle = playerInitials ? "#facc15" : "#f87171";
+      // Interactive Initials Box (Direct Typing in Container)
+      ctx.fillStyle = isEditingInitials ? "rgba(16, 185, 129, 0.15)" : "rgba(255, 255, 255, 0.08)";
+      ctx.fillRect(50, 65, 350, 44);
+      ctx.strokeStyle = isEditingInitials ? "#10b981" : "#facc15";
       ctx.lineWidth = 1.5;
-      ctx.strokeRect(50, 80, 350, 48);
+      ctx.strokeRect(50, 65, 350, 44);
 
-      ctx.fillStyle = playerInitials ? "#facc15" : "#f87171";
-      ctx.font = "600 15px -apple-system, sans-serif";
-      const initialsLabel = playerInitials ? `INITIALS: [ ${playerInitials} ] (Tap to Change)` : "⚠️ TAP TO ENTER INITIALS (REQUIRED)";
-      ctx.fillText(initialsLabel, canvas.width / 2, 110);
+      ctx.fillStyle = isEditingInitials ? "#10b981" : "#facc15";
+      ctx.font = "600 14px -apple-system, sans-serif";
+      const displayInit = playerInitials + (isEditingInitials ? "_" : "");
+      ctx.fillText(`INITIALS: [ ${displayInit} ] ${isEditingInitials ? '(TYPE ON KEYBOARD)' : '(TAP TO TYPE)'}`, canvas.width / 2, 92);
 
-      // Interactive Avatar Box with Stylized Arrows
+      // Interactive Avatar Box
       ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-      ctx.fillRect(50, 140, 350, 48);
+      ctx.fillRect(50, 120, 350, 44);
       ctx.strokeStyle = "#10b981";
-      ctx.strokeRect(50, 140, 350, 48);
+      ctx.strokeRect(50, 120, 350, 44);
 
       // Left Arrow
       ctx.fillStyle = "#047857";
-      ctx.fillRect(52, 142, 46, 44);
+      ctx.fillRect(52, 122, 44, 40);
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 20px -apple-system, sans-serif";
-      ctx.fillText("⟨", 75, 170);
+      ctx.font = "bold 18px -apple-system, sans-serif";
+      ctx.fillText("⟨", 74, 147);
 
       // Right Arrow
       ctx.fillStyle = "#047857";
-      ctx.fillRect(352, 142, 46, 44);
+      ctx.fillRect(354, 122, 44, 40);
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 20px -apple-system, sans-serif";
-      ctx.fillText("⟩", 375, 170);
+      ctx.font = "bold 18px -apple-system, sans-serif";
+      ctx.fillText("⟩", 376, 147);
 
       // Avatar Name & Emoji Center Label
       ctx.fillStyle = "#10b981";
-      ctx.font = "600 15px -apple-system, sans-serif";
-      ctx.fillText(`AVATAR: ${customAvatarImg ? 'Custom 📁' : currentAvatar.emoji + ' ' + currentAvatar.name}`, canvas.width / 2, 170);
+      ctx.font = "600 14px -apple-system, sans-serif";
+      ctx.fillText(`AVATAR: ${customAvatarImg ? 'Custom 📁' : currentAvatar.emoji + ' ' + currentAvatar.name}`, canvas.width / 2, 147);
 
       // Leaderboard Top 15 with Date & Time
-      drawLeaderboardCard(200, "🏆 TOP 15 HALL OF FAME 🏆");
+      drawLeaderboardCard(180, "🏆 TOP 15 HALL OF FAME 🏆");
 
-      // TAP TO START BUTTON
-      const btnX = 80;
+      // MENU BOTTOM BUTTON BAR: [ 🧭 GUIDE ] [ ▶ START ]
       const btnY = 650;
-      const btnWidth = 290;
-      const btnHeight = 60;
+      const btnH = 45;
 
-      ctx.fillStyle = "#059669";
-      ctx.fillRect(btnX, btnY, btnWidth, btnHeight);
-      ctx.strokeStyle = "#10b981";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(btnX, btnY, btnWidth, btnHeight);
+      // Guide Button
+      ctx.fillStyle = "#334155";
+      ctx.fillRect(50, btnY, 165, btnH);
+      ctx.strokeStyle = "#64748b";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(50, btnY, 165, btnH);
 
       ctx.fillStyle = "#ffffff";
-      ctx.font = "600 20px -apple-system, sans-serif";
+      ctx.font = "600 14px -apple-system, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("▶ START GAME", btnX + (btnWidth / 2), btnY + (btnHeight / 2));
+      ctx.fillText("🧭 HOW TO PLAY", 132, btnY + (btnH / 2));
+
+      // Start Game Button
+      ctx.fillStyle = "#059669";
+      ctx.fillRect(235, btnY, 165, btnH);
+      ctx.strokeStyle = "#10b981";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(235, btnY, 165, btnH);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "600 14px -apple-system, sans-serif";
+      ctx.fillText("▶ START GAME", 317, btnY + (btnH / 2));
+
       ctx.textBaseline = "alphabetic";
       ctx.textAlign = "left";
     }
 
     // ==========================================
-    // GAME OVER SCREEN WITH MODERNIZED NAVIGATION
+    // GAME OVER SCREEN (WITH AUDIO & CUSTOM AVATAR OPTIONS)
     // ==========================================
     if (gameOver) {
       ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.fillStyle = "#f87171";
-      ctx.font = "bold 30px -apple-system, sans-serif";
+      ctx.font = "bold 28px -apple-system, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("GAME OVER", canvas.width / 2, 45);
+      ctx.fillText("GAME OVER", canvas.width / 2, 40);
 
       ctx.fillStyle = "#ffffff";
-      ctx.font = "15px -apple-system, sans-serif";
-      ctx.fillText(`Final Score (${playerInitials || "AAA"}): ${score} pts`, canvas.width / 2, 72);
+      ctx.font = "14px -apple-system, sans-serif";
+      ctx.fillText(`Final Score (${playerInitials || "ACE"}): ${score} pts`, canvas.width / 2, 62);
 
       // Full Top 15 Leaderboard with Timestamp
-      drawLeaderboardCard(90, "🏅 TOP 15 SCORES LEADERBOARD 🏅");
+      drawLeaderboardCard(80, "🏅 TOP 15 SCORES LEADERBOARD 🏅");
 
-      // Game Over Modern Action Buttons (Home vs Play Again)
-      const btnW = 170;
-      const btnH = 50;
-      const btnY = 660;
+      const btnW = 175;
+      const btnH = 40;
 
-      // 1. Home Menu Button (Left)
-      ctx.fillStyle = "#334155";
-      ctx.fillRect(45, btnY, btnW, btnH);
-      ctx.strokeStyle = "#64748b";
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(45, btnY, btnW, btnH);
+      // Row 1: Settings (Audio Toggle & Upload Custom Avatar)
+      const row1Y = 645;
+
+      // 1. Audio Toggle
+      ctx.fillStyle = audioMuted ? "#475569" : "#0284c7";
+      ctx.fillRect(40, row1Y, btnW, btnH);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(40, row1Y, btnW, btnH);
 
       ctx.fillStyle = "#ffffff";
-      ctx.font = "600 15px -apple-system, sans-serif";
+      ctx.font = "600 13px -apple-system, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("🏠 HOME", 45 + (btnW / 2), btnY + (btnH / 2));
+      ctx.fillText(audioMuted ? "🔇 AUDIO: OFF" : "🔊 AUDIO: ON", 40 + (btnW / 2), row1Y + (btnH / 2));
 
-      // 2. Play Again Button (Right)
-      ctx.fillStyle = "#059669";
-      ctx.fillRect(235, btnY, btnW, btnH);
-      ctx.strokeStyle = "#10b981";
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(235, btnY, btnW, btnH);
+      // 2. Custom Avatar Upload
+      ctx.fillStyle = "#0284c7";
+      ctx.fillRect(235, row1Y, btnW, btnH);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(235, row1Y, btnW, btnH);
 
       ctx.fillStyle = "#ffffff";
-      ctx.font = "600 15px -apple-system, sans-serif";
-      ctx.fillText("🎮 PLAY AGAIN", 235 + (btnW / 2), btnY + (btnH / 2));
+      ctx.font = "600 13px -apple-system, sans-serif";
+      ctx.fillText("📁 CUSTOM AVATAR", 235 + (btnW / 2), row1Y + (btnH / 2));
+
+      // Row 2: Navigation (Home vs Play Again)
+      const row2Y = 695;
+
+      // 3. Home Menu Button (Left)
+      ctx.fillStyle = "#334155";
+      ctx.fillRect(40, row2Y, btnW, btnH);
+      ctx.strokeStyle = "#64748b";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(40, row2Y, btnW, btnH);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "600 14px -apple-system, sans-serif";
+      ctx.fillText("🏠 HOME", 40 + (btnW / 2), row2Y + (btnH / 2));
+
+      // 4. Play Again Button (Right)
+      ctx.fillStyle = "#059669";
+      ctx.fillRect(235, row2Y, btnW, btnH);
+      ctx.strokeStyle = "#10b981";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(235, row2Y, btnW, btnH);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "600 14px -apple-system, sans-serif";
+      ctx.fillText("🎮 PLAY AGAIN", 235 + (btnW / 2), row2Y + (btnH / 2));
 
       ctx.textBaseline = "alphabetic";
       ctx.textAlign = "left";
     }
 
-    // Draw Info Modal Overlay over everything when open
+    // Overlay Guide
     if (showInfoModal) {
       drawInfoModal();
     }
@@ -990,7 +1042,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function resetGame() {
     player.y = 300;
     player.vy = 0;
-    player.inventory.shield = true;
+    player.shieldCount = 1;
     player.inventory.sword = false;
     giantShield.active = false;
     giantShield.pipesRemaining = 0;
