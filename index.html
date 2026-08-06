@@ -1,82 +1,67 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>pixelflap</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Crystal Flyer</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div id="game-container">
-    <canvas id="game-canvas" width="400" height="600"></canvas>
+    <canvas id="gameCanvas"></canvas>
 
-    <div id="score-hud">0</div>
-
-    <div id="start-screen" class="overlay">
-      <h1>pixelflap</h1>
-      <p>choose your character</p>
-      <div id="character-select">
-        <div class="char-option" data-character="star" tabindex="0" role="button" aria-label="Star character">
-          <svg class="char-preview" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <polygon points="50,8 62,38 95,38 68,58 78,90 50,70 22,90 32,58 5,38 38,38"
-              fill="#f9d84a" stroke="#1e2327" stroke-width="4" stroke-linejoin="round"/>
-            <circle cx="42" cy="48" r="4.5" fill="#1e2327"/>
-            <circle cx="60" cy="48" r="4.5" fill="#1e2327"/>
-            <path d="M42 60 Q51 68 60 60" stroke="#1e2327" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-          </svg>
-          <span>star</span>
-        </div>
-        <div class="char-option" data-character="cat" tabindex="0" role="button" aria-label="Cat character">
-          <svg class="char-preview" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <polygon points="22,35 34,8 42,38" fill="#e8955c" stroke="#1e2327" stroke-width="3.5" stroke-linejoin="round"/>
-            <polygon points="78,35 66,8 58,38" fill="#e8955c" stroke="#1e2327" stroke-width="3.5" stroke-linejoin="round"/>
-            <polygon points="27,32 34,16 39,34" fill="#f4a9c0"/>
-            <polygon points="73,32 66,16 61,34" fill="#f4a9c0"/>
-            <circle cx="50" cy="52" r="34" fill="#f4a862" stroke="#1e2327" stroke-width="4"/>
-            <circle cx="38" cy="46" r="7" fill="#fff"/>
-            <circle cx="62" cy="46" r="7" fill="#fff"/>
-            <circle cx="38" cy="46" r="3.5" fill="#1e2327"/>
-            <circle cx="62" cy="46" r="3.5" fill="#1e2327"/>
-            <polygon points="46,58 54,58 50,64" fill="#e8637f"/>
-            <line x1="18" y1="58" x2="34" y2="61" stroke="#1e2327" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="82" y1="58" x2="66" y2="61" stroke="#1e2327" stroke-width="2.5" stroke-linecap="round"/>
-          </svg>
-          <span>cat</span>
-        </div>
-        <div class="char-option" data-character="dog" tabindex="0" role="button" aria-label="Dog character">
-          <svg class="char-preview" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <ellipse cx="20" cy="58" rx="12" ry="20" transform="rotate(-20 20 58)" fill="#8a5a34" stroke="#1e2327" stroke-width="3.5"/>
-            <circle cx="50" cy="52" r="34" fill="#c98a4b" stroke="#1e2327" stroke-width="4"/>
-            <ellipse cx="63" cy="62" rx="18" ry="13" fill="#f0d9b5"/>
-            <circle cx="74" cy="60" r="5" fill="#1e2327"/>
-            <circle cx="44" cy="42" r="4" fill="#1e2327"/>
-          </svg>
-          <span>dog</span>
-        </div>
+    <!-- UI Overlay: Character Select & Splash -->
+    <div id="character-select" class="overlay">
+      <h1>CRYSTAL FLYER</h1>
+      <p class="subtitle">Select or upload your character:</p>
+      
+      <div class="character-grid">
+        <button class="char-btn active" data-char="cat">
+          <div class="char-preview cat-icon"></div>
+          <span>Cat</span>
+        </button>
+        <button class="char-btn" data-char="dog">
+          <div class="char-preview dog-icon"></div>
+          <span>Dog</span>
+        </button>
+        <button class="char-btn" data-char="star">
+          <div class="char-preview star-icon"></div>
+          <span>Star</span>
+        </button>
       </div>
-      <p>tap, click, or press space to flap</p>
-      <button id="start-btn">play</button>
+
+      <!-- Custom Image Upload Feature -->
+      <div class="upload-section">
+        <label for="imageUpload" class="upload-label">📁 Upload Custom Avatar</label>
+        <input type="file" id="imageUpload" accept="image/*" />
+        <span id="uploadStatus"></span>
+      </div>
+
+      <div class="name-input-group">
+        <input type="text" id="playerName" placeholder="Enter your name" maxlength="12" value="Player1" />
+      </div>
+
+      <button id="startBtn" class="primary-btn">Tap / Click to Play</button>
     </div>
 
-    <div id="game-over-screen" class="overlay hidden">
-      <h1>game over</h1>
-      <p id="final-score">score: 0</p>
-      <p id="best-score">best: 0</p>
-
-      <div id="initials-entry">
-        <label for="initials-input">enter initials</label>
-        <input id="initials-input" maxlength="3" autocomplete="off" autocapitalize="characters" placeholder="AAA">
-        <button id="save-score-btn">save score</button>
+    <!-- UI Overlay: Game Over & Live Leaderboard -->
+    <div id="game-over" class="overlay hidden">
+      <h2>GAME OVER</h2>
+      <div class="score-summary">
+        <p>Score: <span id="finalScore">0</span></p>
+        <p>Best: <span id="bestScore">0</span></p>
       </div>
 
-      <div id="leaderboard">
-        <h2>high scores</h2>
-        <ol id="leaderboard-list"></ol>
+      <div class="leaderboard-box">
+        <h3>🏆 High Scores</h3>
+        <ul id="leaderboardList">
+          <li>Loading scores...</li>
+        </ul>
       </div>
 
-      <div id="game-over-actions">
-        <button id="retry-btn">retry</button>
-        <button id="change-character-btn" class="secondary-btn">change character</button>
+      <div class="button-group">
+        <button id="retryBtn" class="primary-btn">Play Again</button>
+        <button id="changeCharBtn" class="secondary-btn">Change Character</button>
       </div>
     </div>
   </div>

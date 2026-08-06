@@ -1,489 +1,298 @@
-// ============================================================
-// CHARACTER CONFIG — swap this out later to reskin the game.
-// Add new characters here and change ACTIVE_CHARACTER to switch.
-// Each character just needs a draw(ctx, x, y, radius, rotation) fn.
-// ============================================================
-const CHARACTERS = {
-  blob: {
-    radius: 16,
-    draw(ctx, x, y, radius, rotation) {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(rotation);
+// ==========================================
+// CONFIGURATION
+// ==========================================
+const WORKER_URL = "https://game-leaderboard-api.acekallas.workers.dev";
 
-      // body
-      ctx.fillStyle = '#f6c744';
-      ctx.strokeStyle = '#1e2327';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(0, 0, radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
 
-      // eye
-      ctx.fillStyle = '#1e2327';
-      ctx.beginPath();
-      ctx.arc(radius * 0.35, -radius * 0.25, radius * 0.15, 0, Math.PI * 2);
-      ctx.fill();
-
-      // little wing
-      ctx.fillStyle = '#e0a92f';
-      ctx.beginPath();
-      ctx.ellipse(-radius * 0.2, radius * 0.1, radius * 0.5, radius * 0.3, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
-    }
-  },
-
-  star: {
-    radius: 20,
-    draw(ctx, x, y, radius, rotation) {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(rotation);
-
-      const spikes = 5;
-      const outerR = radius;
-      const innerR = radius * 0.5;
-
-      ctx.fillStyle = '#f9d84a';
-      ctx.strokeStyle = '#1e2327';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      for (let i = 0; i < spikes * 2; i++) {
-        const r = i % 2 === 0 ? outerR : innerR;
-        const angle = (Math.PI / spikes) * i - Math.PI / 2;
-        const px = Math.cos(angle) * r;
-        const py = Math.sin(angle) * r;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // face
-      ctx.fillStyle = '#1e2327';
-      ctx.beginPath();
-      ctx.arc(-radius * 0.22, -radius * 0.05, radius * 0.09, 0, Math.PI * 2);
-      ctx.arc(radius * 0.22, -radius * 0.05, radius * 0.09, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.strokeStyle = '#1e2327';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, radius * 0.05, radius * 0.22, 0.15 * Math.PI, 0.85 * Math.PI);
-      ctx.stroke();
-
-      ctx.restore();
-    }
-  },
-
-  cat: {
-    radius: 20,
-    draw(ctx, x, y, radius, rotation) {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(rotation);
-
-      ctx.strokeStyle = '#1e2327';
-      ctx.lineWidth = 3;
-
-      // outer ears (bigger + more triangular for clarity at small size)
-      ctx.fillStyle = '#e8955c';
-      ctx.beginPath();
-      ctx.moveTo(-radius * 0.75, -radius * 0.5);
-      ctx.lineTo(-radius * 0.15, -radius * 1.35);
-      ctx.lineTo(-radius * 0.05, -radius * 0.35);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(radius * 0.75, -radius * 0.5);
-      ctx.lineTo(radius * 0.15, -radius * 1.35);
-      ctx.lineTo(radius * 0.05, -radius * 0.35);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // inner ears (pink, for contrast/readability)
-      ctx.fillStyle = '#f4a9c0';
-      ctx.beginPath();
-      ctx.moveTo(-radius * 0.55, -radius * 0.55);
-      ctx.lineTo(-radius * 0.22, -radius * 1.0);
-      ctx.lineTo(-radius * 0.12, -radius * 0.5);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.moveTo(radius * 0.55, -radius * 0.55);
-      ctx.lineTo(radius * 0.22, -radius * 1.0);
-      ctx.lineTo(radius * 0.12, -radius * 0.5);
-      ctx.closePath();
-      ctx.fill();
-
-      // head
-      ctx.fillStyle = '#f4a862';
-      ctx.beginPath();
-      ctx.arc(0, radius * 0.05, radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // big round eyes
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(-radius * 0.32, -radius * 0.02, radius * 0.22, 0, Math.PI * 2);
-      ctx.arc(radius * 0.32, -radius * 0.02, radius * 0.22, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = '#1e2327';
-      ctx.beginPath();
-      ctx.arc(-radius * 0.28, -radius * 0.02, radius * 0.11, 0, Math.PI * 2);
-      ctx.arc(radius * 0.28, -radius * 0.02, radius * 0.11, 0, Math.PI * 2);
-      ctx.fill();
-
-      // pink nose
-      ctx.fillStyle = '#e8637f';
-      ctx.beginPath();
-      ctx.moveTo(-radius * 0.09, radius * 0.28);
-      ctx.lineTo(radius * 0.09, radius * 0.28);
-      ctx.lineTo(0, radius * 0.4);
-      ctx.closePath();
-      ctx.fill();
-
-      // whiskers
-      ctx.strokeStyle = '#1e2327';
-      ctx.lineWidth = 1.75;
-      ctx.beginPath();
-      ctx.moveTo(-radius * 0.75, radius * 0.32);
-      ctx.lineTo(-radius * 0.15, radius * 0.38);
-      ctx.moveTo(radius * 0.75, radius * 0.32);
-      ctx.lineTo(radius * 0.15, radius * 0.38);
-      ctx.stroke();
-
-      ctx.restore();
-    }
-  },
-
-  dog: {
-    radius: 20,
-    draw(ctx, x, y, radius, rotation) {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(rotation);
-
-      // floppy ear
-      ctx.fillStyle = '#8a5a34';
-      ctx.strokeStyle = '#1e2327';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.ellipse(-radius * 0.75, radius * 0.1, radius * 0.35, radius * 0.55, -0.4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // head
-      ctx.fillStyle = '#c98a4b';
-      ctx.beginPath();
-      ctx.arc(0, 0, radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // snout patch
-      ctx.fillStyle = '#f0d9b5';
-      ctx.beginPath();
-      ctx.ellipse(radius * 0.35, radius * 0.3, radius * 0.45, radius * 0.32, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // nose
-      ctx.fillStyle = '#1e2327';
-      ctx.beginPath();
-      ctx.arc(radius * 0.65, radius * 0.28, radius * 0.12, 0, Math.PI * 2);
-      ctx.fill();
-
-      // eye
-      ctx.beginPath();
-      ctx.arc(radius * 0.1, -radius * 0.15, radius * 0.11, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
-    }
-  }
-};
-
-const DEFAULT_CHARACTER = 'star';
-let ACTIVE_CHARACTER = localStorage.getItem('pixelflap-character') || DEFAULT_CHARACTER;
-
-// ============================================================
-// GAME SETUP
-// ============================================================
-const canvas = document.getElementById('game-canvas');
-const ctx = canvas.getContext('2d');
-
-const GAME_WIDTH = canvas.width;
-const GAME_HEIGHT = canvas.height;
-
-const GRAVITY = 0.45;
-const FLAP_VELOCITY = -8;
-const PIPE_WIDTH = 60;
-const PIPE_GAP = 160;
-const PIPE_SPEED = 2.5;
-const PIPE_SPAWN_INTERVAL = 90; // frames
-
-const scoreHud = document.getElementById('score-hud');
-const startScreen = document.getElementById('start-screen');
-const gameOverScreen = document.getElementById('game-over-screen');
-const finalScoreEl = document.getElementById('final-score');
-const bestScoreEl = document.getElementById('best-score');
-const startBtn = document.getElementById('start-btn');
-const retryBtn = document.getElementById('retry-btn');
-const initialsEntry = document.getElementById('initials-entry');
-const initialsInput = document.getElementById('initials-input');
-const saveScoreBtn = document.getElementById('save-score-btn');
-const leaderboardList = document.getElementById('leaderboard-list');
-const changeCharacterBtn = document.getElementById('change-character-btn');
-
-const LEADERBOARD_KEY = 'pixelflap-leaderboard';
-const MAX_LEADERBOARD_ENTRIES = 10;
-
-function loadLeaderboard() {
-  try {
-    const stored = localStorage.getItem(LEADERBOARD_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
+// Responsive Scaling
+function resizeCanvas() {
+  canvas.width = canvas.parentElement.clientWidth;
+  canvas.height = canvas.parentElement.clientHeight;
 }
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
 
-function saveLeaderboard(entries) {
-  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(entries));
-}
+// Game State
+let gameState = "MENU"; // MENU, PLAYING, GAMEOVER
+let score = 0;
+let bestScore = localStorage.getItem("crystal_best") || 0;
+let selectedChar = "cat";
+let customImage = null; // Custom uploaded avatar Image object
 
-function addLeaderboardEntry(initials, entryScore) {
-  const entries = loadLeaderboard();
-  entries.push({
-    initials: initials || '---',
-    score: entryScore,
-    date: new Date().toISOString()
+// Physics Engine Vars
+let birdY = canvas.height / 2;
+let velocity = 0;
+const gravity = 0.38;
+const jump = -7.5;
+const birdRadius = 22; // Enlarged for high-DPI clarity
+
+// Crystal Obstacles
+let pipes = [];
+const pipeWidth = 50;
+const pipeGap = 160;
+let frameCount = 0;
+
+// UI Elements
+const charSelectOverlay = document.getElementById("character-select");
+const gameOverOverlay = document.getElementById("game-over");
+const startBtn = document.getElementById("startBtn");
+const retryBtn = document.getElementById("retryBtn");
+const changeCharBtn = document.getElementById("changeCharBtn");
+const imageUpload = document.getElementById("imageUpload");
+const uploadStatus = document.getElementById("uploadStatus");
+const playerNameInput = document.getElementById("playerName");
+
+// ==========================================
+// CUSTOM IMAGE UPLOADER
+// ==========================================
+imageUpload.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function (event) {
+      const img = new Image();
+      img.onload = function () {
+        customImage = img;
+        selectedChar = "custom";
+        // Remove active state from preset buttons
+        document.querySelectorAll(".char-btn").forEach(b => b.classList.remove("active"));
+        uploadStatus.innerText = "✓ Avatar Loaded!";
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+// Character Picker Listener
+document.querySelectorAll(".char-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".char-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    selectedChar = btn.dataset.char;
+    customImage = null; // Reset custom image if user chooses default
+    uploadStatus.innerText = "";
   });
-  entries.sort((a, b) => b.score - a.score);
-  const trimmed = entries.slice(0, MAX_LEADERBOARD_ENTRIES);
-  saveLeaderboard(trimmed);
-  return trimmed;
-}
+});
 
-function formatDate(isoString) {
-  const d = new Date(isoString);
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
-    ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-}
+// ==========================================
+// NAVIGATION & OVERLAY CONTROLS
+// ==========================================
+startBtn.addEventListener("click", startGame);
 
-function renderLeaderboard() {
-  const entries = loadLeaderboard();
-  leaderboardList.innerHTML = '';
-  if (entries.length === 0) {
-    const li = document.createElement('li');
-    li.textContent = 'no scores yet';
-    leaderboardList.appendChild(li);
-    return;
-  }
-  entries.forEach(entry => {
-    const li = document.createElement('li');
-    li.innerHTML = `
-      <span class="lb-initials">${entry.initials}</span>
-      <span>${entry.score}</span>
-      <span class="lb-date">${formatDate(entry.date)}</span>
-    `;
-    leaderboardList.appendChild(li);
-  });
-}
+retryBtn.addEventListener("click", () => {
+  gameOverOverlay.classList.add("hidden");
+  resetGameVars();
+  gameState = "PLAYING";
+});
 
-function getCharacter() {
-  return CHARACTERS[ACTIVE_CHARACTER];
-}
-
-let state = 'idle'; // idle | playing | dead
-let player, pipes, frameCount, score, bestScore;
-
-function resetGame() {
-  player = {
-    x: GAME_WIDTH * 0.3,
-    y: GAME_HEIGHT / 2,
-    velocity: 0,
-    radius: getCharacter().radius
-  };
-  pipes = [];
-  frameCount = 0;
-  score = 0;
-  scoreHud.textContent = '0';
-}
-
-function loadBestScore() {
-  const stored = localStorage.getItem('pixelflap-best-score');
-  bestScore = stored ? parseInt(stored, 10) : 0;
-}
-
-function saveBestScoreIfNeeded() {
-  if (score > bestScore) {
-    bestScore = score;
-    localStorage.setItem('pixelflap-best-score', String(bestScore));
-  }
-}
-
-function spawnPipe() {
-  const margin = 60;
-  const gapCenter = margin + Math.random() * (GAME_HEIGHT - margin * 2 - PIPE_GAP);
-  pipes.push({
-    x: GAME_WIDTH,
-    gapTop: gapCenter - PIPE_GAP / 2,
-    gapBottom: gapCenter + PIPE_GAP / 2,
-    passed: false
-  });
-}
-
-function flap() {
-  if (state === 'idle') {
-    startGame();
-  } else if (state === 'playing') {
-    player.velocity = FLAP_VELOCITY;
-  } else if (state === 'dead') {
-    // ignore taps until retry button pressed
-  }
-}
+// Fix: Change Character Button Action
+changeCharBtn.addEventListener("click", () => {
+  gameOverOverlay.classList.add("hidden");
+  charSelectOverlay.classList.remove("hidden");
+  gameState = "MENU";
+  resetGameVars();
+});
 
 function startGame() {
-  // Re-derive the active character straight from the DOM at the moment
-  // play is pressed, rather than trusting only the in-memory variable.
-  const selectedOption = document.querySelector('.char-option.selected');
-  if (selectedOption) {
-    ACTIVE_CHARACTER = selectedOption.dataset.character;
-  }
-
-  resetGame();
-  state = 'playing';
-  startScreen.classList.add('hidden');
-  gameOverScreen.classList.add('hidden');
-  player.velocity = FLAP_VELOCITY;
+  charSelectOverlay.classList.add("hidden");
+  gameOverOverlay.classList.add("hidden");
+  resetGameVars();
+  gameState = "PLAYING";
 }
 
-function endGame() {
-  state = 'dead';
-  saveBestScoreIfNeeded();
-  finalScoreEl.textContent = `score: ${score}`;
-  bestScoreEl.textContent = `best: ${bestScore}`;
-  gameOverScreen.classList.remove('hidden');
-
-  initialsEntry.classList.remove('hidden');
-  initialsInput.value = '';
-  renderLeaderboard();
-  setTimeout(() => initialsInput.focus(), 0);
+function resetGameVars() {
+  birdY = canvas.height / 2;
+  velocity = 0;
+  pipes = [];
+  score = 0;
+  frameCount = 0;
 }
 
-function update() {
-  if (state !== 'playing') return;
+// User Interaction / Jump
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Space") handleAction();
+});
+canvas.addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  handleAction();
+}, { passive: false });
+canvas.addEventListener("mousedown", handleAction);
 
-  frameCount++;
-
-  // physics
-  player.velocity += GRAVITY;
-  player.y += player.velocity;
-
-  // spawn pipes
-  if (frameCount % PIPE_SPAWN_INTERVAL === 0) {
-    spawnPipe();
-  }
-
-  // move pipes + scoring + collision
-  for (const pipe of pipes) {
-    pipe.x -= PIPE_SPEED;
-
-    if (!pipe.passed && pipe.x + PIPE_WIDTH < player.x) {
-      pipe.passed = true;
-      score++;
-      scoreHud.textContent = String(score);
-    }
-
-    const withinPipeX =
-      player.x + player.radius > pipe.x &&
-      player.x - player.radius < pipe.x + PIPE_WIDTH;
-
-    if (withinPipeX) {
-      const hitsTop = player.y - player.radius < pipe.gapTop;
-      const hitsBottom = player.y + player.radius > pipe.gapBottom;
-      if (hitsTop || hitsBottom) {
-        endGame();
-      }
-    }
-  }
-
-  // remove off-screen pipes
-  pipes = pipes.filter(p => p.x + PIPE_WIDTH > 0);
-
-  // floor / ceiling collision
-  if (player.y + player.radius > GAME_HEIGHT || player.y - player.radius < 0) {
-    player.y = Math.max(player.radius, Math.min(GAME_HEIGHT - player.radius, player.y));
-    endGame();
+function handleAction() {
+  if (gameState === "PLAYING") {
+    velocity = jump;
   }
 }
 
-function drawCrystalSpire(x, y, w, h, capAtBottom) {
+// ==========================================
+// RENDER HELPERS (Clear Cat, Single Star, Custom Avatar)
+// ==========================================
+function drawPlayer(x, y) {
   ctx.save();
+  ctx.translate(x, y);
 
-  // gradient body — cool purple/blue, distinct from a plain green pipe
-  const grad = ctx.createLinearGradient(x, 0, x + w, 0);
-  grad.addColorStop(0, '#4a3fc7');
-  grad.addColorStop(0.5, '#8b7ff5');
-  grad.addColorStop(1, '#4a3fc7');
-  ctx.fillStyle = grad;
-  ctx.strokeStyle = '#241c66';
-  ctx.lineWidth = 3;
+  if (selectedChar === "custom" && customImage) {
+    // Render Custom Uploaded Image inside a circle
+    ctx.beginPath();
+    ctx.arc(0, 0, birdRadius, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(customImage, -birdRadius, -birdRadius, birdRadius * 2, birdRadius * 2);
+  } else if (selectedChar === "cat") {
+    // High-Clarity Cat Design
+    // Head Base
+    ctx.fillStyle = "#f97316";
+    ctx.beginPath();
+    ctx.arc(0, 0, birdRadius, 0, Math.PI * 2);
+    ctx.fill();
 
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, 10);
-  ctx.fill();
-  ctx.stroke();
+    // Outer Ears
+    ctx.fillStyle = "#f97316";
+    ctx.beginPath();
+    ctx.moveTo(-16, -10); ctx.lineTo(-22, -26); ctx.lineTo(-6, -18); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(16, -10); ctx.lineTo(22, -26); ctx.lineTo(6, -18); ctx.fill();
 
-  // vertical highlight stripe for a faceted-crystal feel
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
-  ctx.fillRect(x + w * 0.18, y + 6, w * 0.16, h - 12);
+    // Inner Pink Ears
+    ctx.fillStyle = "#f472b6";
+    ctx.beginPath();
+    ctx.moveTo(-14, -12); ctx.lineTo(-19, -22); ctx.lineTo(-8, -17); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(14, -12); ctx.lineTo(19, -22); ctx.lineTo(8, -17); ctx.fill();
 
-  // diamond cap pointing toward the gap
-  const capSize = w * 0.65;
-  const capX = x + w / 2;
-  const capY = capAtBottom ? y + h : y;
-  const dir = capAtBottom ? 1 : -1;
+    // Large Eyes
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(-7, -2, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(7, -2, 6, 0, Math.PI * 2); ctx.fill();
 
-  ctx.fillStyle = '#a89bff';
-  ctx.beginPath();
-  ctx.moveTo(capX, capY + dir * capSize * 0.55);
-  ctx.lineTo(capX + capSize / 2, capY);
-  ctx.lineTo(capX, capY - dir * capSize * 0.55);
-  ctx.lineTo(capX - capSize / 2, capY);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+    ctx.fillStyle = "#000000";
+    ctx.beginPath(); ctx.arc(-6, -2, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(8, -2, 3, 0, Math.PI * 2); ctx.fill();
+
+    // Pink Nose Triangle
+    ctx.fillStyle = "#f472b6";
+    ctx.beginPath();
+    ctx.moveTo(0, 3); ctx.lineTo(-3, 7); ctx.lineTo(3, 7); ctx.fill();
+
+  } else if (selectedChar === "star") {
+    // Single Crisp Star Rendering (Fixed double-render glitch)
+    ctx.fillStyle = "#facc15";
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      ctx.lineTo(
+        Math.cos(((18 + i * 72) * Math.PI) / 180) * birdRadius,
+        -Math.sin(((18 + i * 72) * Math.PI) / 180) * birdRadius
+      );
+      ctx.lineTo(
+        Math.cos(((54 + i * 72) * Math.PI) / 180) * (birdRadius / 2),
+        -Math.sin(((54 + i * 72) * Math.PI) / 180) * (birdRadius / 2)
+      );
+    }
+    ctx.closePath();
+    ctx.fill();
+
+  } else {
+    // Dog Avatar
+    ctx.fillStyle = "#eab308";
+    ctx.beginPath(); ctx.arc(0, 0, birdRadius, 0, Math.PI * 2); ctx.fill();
+    // Floppy Ears
+    ctx.fillStyle = "#ca8a04";
+    ctx.beginPath(); ctx.ellipse(-18, 0, 6, 14, Math.PI / 6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(18, 0, 6, 14, -Math.PI / 6, 0, Math.PI * 2); ctx.fill();
+    // Eyes & Nose
+    ctx.fillStyle = "#000000";
+    ctx.beginPath(); ctx.arc(-6, -3, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(6, -3, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 4, 4, 0, Math.PI * 2); ctx.fill();
+  }
 
   ctx.restore();
 }
 
-function draw() {
-  // sky — soft dusk gradient instead of flat blue
-  const sky = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
-  sky.addColorStop(0, '#6f86d6');
-  sky.addColorStop(1, '#c99fd6');
-  ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+// ==========================================
+// MAIN GAME LOOP & OBSTACLES
+// ==========================================
+function update() {
+  if (gameState !== "PLAYING") return;
 
-  // crystal spires
-  for (const pipe of pipes) {
-    drawCrystalSpire(pipe.x, 0, PIPE_WIDTH, pipe.gapTop, true);
-    drawCrystalSpire(pipe.x, pipe.gapBottom, PIPE_WIDTH, GAME_HEIGHT - pipe.gapBottom, false);
+  velocity += gravity;
+  birdY += velocity;
+
+  // Floor / Ceiling Collision
+  if (birdY + birdRadius >= canvas.height || birdY - birdRadius <= 0) {
+    endGame();
   }
 
-  // player
-  const rotation = Math.max(-0.5, Math.min(0.9, player.velocity * 0.06));
-  getCharacter().draw(ctx, player.x, player.y, player.radius, rotation);
+  // Spawn Crystal Pipes
+  frameCount++;
+  if (frameCount % 90 === 0) {
+    const topHeight = Math.random() * (canvas.height - pipeGap - 120) + 40;
+    pipes.push({ x: canvas.width, top: topHeight, passed: false });
+  }
+
+  // Move Pipes
+  for (let i = pipes.length - 1; i >= 0; i--) {
+    pipes[i].x -= 2.5;
+
+    // Check Score
+    if (!pipes[i].passed && pipes[i].x < 80) {
+      pipes[i].passed = true;
+      score++;
+    }
+
+    // Collision Check
+    const p = pipes[i];
+    if (
+      80 + birdRadius > p.x &&
+      80 - birdRadius < p.x + pipeWidth &&
+      (birdY - birdRadius < p.top || birdY + birdRadius > p.top + pipeGap)
+    ) {
+      endGame();
+    }
+
+    // Remove Off-screen Pipes
+    if (pipes[i].x + pipeWidth < 0) {
+      pipes.splice(i, 1);
+    }
+  }
+}
+
+function draw() {
+  // Dusk Sky Background
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  skyGrad.addColorStop(0, "#1e1b4b");
+  skyGrad.addColorStop(1, "#311042");
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw Crystal Spires (Obstacles)
+  pipes.forEach((p) => {
+    const crystalGrad = ctx.createLinearGradient(p.x, 0, p.x + pipeWidth, 0);
+    crystalGrad.addColorStop(0, "#a855f7");
+    crystalGrad.addColorStop(0.5, "#3b82f6");
+    crystalGrad.addColorStop(1, "#1e40af");
+
+    ctx.fillStyle = crystalGrad;
+    // Top Crystal
+    ctx.fillRect(p.x, 0, pipeWidth, p.top);
+    // Bottom Crystal
+    ctx.fillRect(p.x, p.top + pipeGap, pipeWidth, canvas.height - (p.top + pipeGap));
+  });
+
+  // Draw Player Avatar
+  if (gameState === "PLAYING") {
+    drawPlayer(80, birdY);
+  }
+
+  // Draw Live Score Counter
+  if (gameState === "PLAYING") {
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 28px sans-serif";
+    ctx.fillText(score, canvas.width / 2 - 10, 50);
+  }
 }
 
 function loop() {
@@ -491,90 +300,66 @@ function loop() {
   draw();
   requestAnimationFrame(loop);
 }
-
-// ============================================================
-// CHARACTER SELECTION
-// ============================================================
-const charOptions = document.querySelectorAll('.char-option');
-
-function selectCharacter(key) {
-  ACTIVE_CHARACTER = key;
-  localStorage.setItem('pixelflap-character', ACTIVE_CHARACTER);
-  markSelectedOption();
-}
-
-function markSelectedOption() {
-  charOptions.forEach(option => {
-    option.classList.toggle('selected', option.dataset.character === ACTIVE_CHARACTER);
-  });
-}
-
-charOptions.forEach(option => {
-  option.addEventListener('click', () => selectCharacter(option.dataset.character));
-  option.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      selectCharacter(option.dataset.character);
-    }
-  });
-});
-
-// ============================================================
-// INPUT
-// ============================================================
-function handleInput(e) {
-  e.preventDefault();
-  flap();
-}
-
-canvas.addEventListener('mousedown', handleInput);
-canvas.addEventListener('touchstart', handleInput);
-document.addEventListener('keydown', (e) => {
-  if (e.code === 'Space') {
-    e.preventDefault();
-    flap();
-  }
-});
-
-startBtn.addEventListener('click', startGame);
-retryBtn.addEventListener('click', startGame);
-
-changeCharacterBtn.addEventListener('click', () => {
-  state = 'idle';
-  gameOverScreen.classList.add('hidden');
-  startScreen.classList.remove('hidden');
-});
-
-// ============================================================
-// HIGH SCORE / INITIALS ENTRY
-// ============================================================
-initialsInput.addEventListener('input', () => {
-  // strip anything that isn't a letter, cap at 3 chars, force uppercase
-  initialsInput.value = initialsInput.value
-    .toUpperCase()
-    .replace(/[^A-Z]/g, '')
-    .slice(0, 3);
-});
-
-initialsInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    saveScoreBtn.click();
-  }
-});
-
-saveScoreBtn.addEventListener('click', () => {
-  const initials = initialsInput.value || 'YOU';
-  addLeaderboardEntry(initials, score);
-  renderLeaderboard();
-  initialsEntry.classList.add('hidden');
-});
-
-// ============================================================
-// INIT
-// ============================================================
-loadBestScore();
-resetGame();
-markSelectedOption();
-draw();
 loop();
+
+// ==========================================
+// HIGH SCORE & LEADERBOARD API INTEGRATION
+// ==========================================
+function endGame() {
+  gameState = "GAMEOVER";
+  document.getElementById("finalScore").innerText = score;
+
+  if (score > bestScore) {
+    bestScore = score;
+    localStorage.setItem("crystal_best", bestScore);
+  }
+  document.getElementById("bestScore").innerText = bestScore;
+
+  gameOverOverlay.classList.remove("hidden");
+
+  // Submit Score & Refresh High Scores list
+  submitScore(playerNameInput.value || "Player1", score);
+}
+
+async function submitScore(name, scoreVal) {
+  const listEl = document.getElementById("leaderboardList");
+  listEl.innerHTML = "<li>Updating leaderboard...</li>";
+
+  try {
+    // 1. Post current score
+    if (scoreVal > 0) {
+      await fetch(`${WORKER_URL}/api/leaderboard`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, score: scoreVal }),
+      });
+    }
+
+    // 2. Retrieve Top 10 from Cloudflare D1
+    const res = await fetch(`${WORKER_URL}/api/leaderboard`);
+    const scores = await res.json();
+
+    listEl.innerHTML = "";
+    if (scores.length === 0) {
+      listEl.innerHTML = "<li>No scores yet. Be the first!</li>";
+      return;
+    }
+
+    scores.forEach((entry, idx) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span>${idx + 1}. ${htmlEscape(entry.player_name)}</span> <strong>${entry.score}</strong>`;
+      listEl.appendChild(li);
+    });
+  } catch (err) {
+    listEl.innerHTML = "<li>Unable to load live scores</li>";
+    console.error("Leaderboard Error:", err);
+  }
+}
+
+function htmlEscape(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
