@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURATION
 // ==========================================
-const WORKER_URL = "https://game-leaderboard-api.acekallas.workers.dev";
+const WORKER_URL = "https://pixelflap-main.acekallas.workers.dev";
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
