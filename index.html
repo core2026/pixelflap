@@ -2,33 +2,30 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>pixelflap</title>
-  <style>
-    body {
-      margin: 0;
-      height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #1e2327;
-      color: #f5f5f5;
-      font-family: system-ui, -apple-system, sans-serif;
-      text-align: center;
-    }
-    h1 {
-      font-size: 2rem;
-      letter-spacing: 0.05em;
-    }
-    p {
-      color: #9aa5b1;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div>
-    <h1>pixelflap</h1>
-    <p>the game is coming — pipeline check in progress</p>
+  <div id="game-container">
+    <canvas id="game-canvas" width="400" height="600"></canvas>
+
+    <div id="score-hud">0</div>
+
+    <div id="start-screen" class="overlay">
+      <h1>pixelflap</h1>
+      <p>tap, click, or press space to flap</p>
+      <button id="start-btn">play</button>
+    </div>
+
+    <div id="game-over-screen" class="overlay hidden">
+      <h1>game over</h1>
+      <p id="final-score">score: 0</p>
+      <p id="best-score">best: 0</p>
+      <button id="retry-btn">retry</button>
+    </div>
   </div>
+
+  <script src="game.js"></script>
 </body>
 </html>
