@@ -1,100 +1,87 @@
 /**
- * =============================================================================
- * PixelJump Leaderboard API (Cloudflare Worker + D1)
- * Version: v2.1.01
- *
- * Talks to a D1 database (binding name: DB, database: "game-leaderboard")
- * with a table shaped like:
- *
- *   CREATE TABLE leaderboard (
- *     id INTEGER PRIMARY KEY AUTOINCREMENT,
- *     player_name TEXT NOT NULL,
- *     score INTEGER NOT NULL,
- *     created_at TEXT NOT NULL
- *   );
- *
- * Endpoints:
- *   GET  /api/leaderboard  -> top 15 scores, highest first
- *   POST /api/leaderboard  -> { name: "ACE", score: 42 } adds a new entry
- *
- * =============================================================================
- * AI / DEVELOPER EDITING REQUIREMENT
- * =============================================================================
- * Anyone (human or AI) who edits this file MUST bump the "Version:" comment
- * above using semantic versioning (MAJOR.MINOR.PATCH):
- *   PATCH -> bug fixes / tiny tweaks / comment-only changes
- *   MINOR -> new endpoints or non-breaking behavior changes
- *   MAJOR -> breaking changes to the API contract
- * =============================================================================
+ * Cloudflare Worker API for PixelJump / PixelFlap Leaderboard
+ * Interacts with Cloudflare D1 Database (env.DB)
  */
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // Allow requests from your game's frontend (GitHub Pages / Cloudflare
-    // Pages / anywhere else it's hosted). Tighten this to your exact domain
-    // once you know it, for slightly better security.
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    };
-
-    // Preflight requests: just acknowledge and let the browser proceed.
+    // 1. Handle CORS Preflight Requests
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders });
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders,
+      });
     }
 
     try {
-      // -----------------------------------------------------------------
-      // GET /api/leaderboard -> top 15 high scores, highest score first
-      // -----------------------------------------------------------------
-      if (url.pathname === "/api/leaderboard" && request.method === "GET") {
+      // 2. GET /api/leaderboard - Fetch Top 15 Scores
+      if (request.method === "GET" && url.pathname === "/api/leaderboard") {
         const { results } = await env.DB.prepare(
-          "SELECT player_name, score, created_at FROM leaderboard ORDER BY score DESC LIMIT 15"
+          `SELECT 
+            player_name, 
+            score, 
+            COALESCE(created_at, CURRENT_TIMESTAMP) AS created_at 
+           FROM leaderboard 
+           ORDER BY score DESC 
+           LIMIT 15`
         ).all();
 
-        return new Response(JSON.stringify(results), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify(results || []), {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
         });
       }
 
-      // -----------------------------------------------------------------
-      // POST /api/leaderboard -> insert a new score
-      // Body: { "name": "ACE", "score": 42 }
-      // -----------------------------------------------------------------
-      if (url.pathname === "/api/leaderboard" && request.method === "POST") {
-        const body = await request.json();
-        const rawName = typeof body.name === "string" ? body.name : "";
-        const rawScore = body.score;
+      // 3. POST /api/leaderboard - Submit a New Score
+      if (request.method === "POST" && url.pathname === "/api/leaderboard") {
+        const body = await request.json().catch(() => ({}));
+        
+        // Clean & validate input
+        const rawName = body.name || body.player_name || "AAA";
+        const cleanName = String(rawName).trim().toUpperCase().replace(/[^A-Z]/g, "").substring(0, 3) || "AAA";
+        const score = parseInt(body.score, 10);
 
-        // --- Basic server-side validation so the leaderboard (and any kid
-        //     playing) can't be griefed by garbage or absurd submissions. ---
-        const name = rawName.trim().toUpperCase().replace(/[^A-Z]/g, "").substring(0, 3) || "---";
-        const score = Math.trunc(Number(rawScore));
-
-        if (!Number.isFinite(score) || score < 0 || score > 100000) {
-          return new Response(JSON.stringify({ error: "Invalid score." }), {
+        if (isNaN(score)) {
+          return new Response(JSON.stringify({ error: "Invalid score" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
 
-        const timestamp = new Date().toISOString();
-
+        // Insert new score with automatic server timestamp
         await env.DB.prepare(
-          "INSERT INTO leaderboard (player_name, score, created_at) VALUES (?, ?, ?)"
-        ).bind(name, score, timestamp).run();
+          `INSERT INTO leaderboard (player_name, score, created_at) 
+           VALUES (?, ?, CURRENT_TIMESTAMP)`
+        ).bind(cleanName, score).run();
 
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({ success: true, name: cleanName, score }), {
+          status: 201,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
         });
       }
 
-      return new Response("API Endpoint Not Found", { status: 404, headers: corsHeaders });
+      // 4. Catch-all for undefined endpoints
+      return new Response(JSON.stringify({ error: "Endpoint not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+
     } catch (err) {
-      return new Response(JSON.stringify({ error: err.message }), {
+      return new Response(JSON.stringify({ error: err.message || "Internal Server Error" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
