@@ -1,7 +1,7 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.1.03
+ * Version: v2.1.04
  *
  * WHAT CHANGED IN v2.1.0
  * - Shield pickup now destroys the pipe it collides with (small hop instead
@@ -28,8 +28,11 @@
  *
  * WHAT CHANGED IN v2.1.03
  * - Enhanced formatServerDate and fetchLeaderboard with property fallback checks
- *   (created_at, createdAt, date, timestamp) to prevent literal "undefined" output
- *   if Worker API property names vary or local cache was stale.
+ *   (created_at, createdAt, date, timestamp) to prevent literal "undefined" output.
+ *
+ * WHAT CHANGED IN v2.1.04
+ * - Hardened date formatting against API responses completely omitting the date field.
+ *   Missing server dates now cleanly display as "--" instead of "undefined".
  *
  * =============================================================================
  * AI / DEVELOPER EDITING REQUIREMENT
@@ -45,7 +48,7 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.1.03";
+  const GAME_VERSION = "v2.1.04";
 
   // ===========================================================================
   // 0. CONFIG
@@ -247,7 +250,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // 6. LEADERBOARD (Cloudflare Worker + D1, with local-cache fallback)
   // ===========================================================================
   function formatServerDate(rawDate) {
-    if (!rawDate) return "--";
+    if (!rawDate || rawDate === "undefined" || rawDate === "null") return "--";
     
     try {
       const d = new Date(rawDate);
@@ -255,7 +258,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
       const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
       const month = months[d.getMonth()];
-      
       if (!month) return "--";
 
       const date = String(d.getDate()).padStart(2, '0');
@@ -281,11 +283,15 @@ window.addEventListener('DOMContentLoaded', () => {
         const li = document.createElement('li');
         const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
         const isYou = hs.name === playerInitials && playerInitials !== "";
+        
+        // Final guard against literal "undefined" string appearing in DOM
+        const displayDate = (hs.date && hs.date !== "undefined") ? hs.date : "--";
+
         li.innerHTML = `
           <span class="score-date">
             <span class="rank-badge">${medal}</span>
             <span style="color:${isYou ? '#52d17c' : 'inherit'}">${hs.name}</span>
-            <span class="time-stamp">${hs.date || ''}</span>
+            <span class="time-stamp">${displayDate}</span>
           </span>
           <span class="score-val">${hs.score} pts</span>`;
         list.appendChild(li);
@@ -301,7 +307,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       
       highScores = data.map(r => {
-        const rawDate = r.created_at || r.createdAt || r.date || r.timestamp;
+        let rawDate = r.created_at || r.createdAt || r.date || r.timestamp || r.created;
         return {
           name: r.player_name || r.name || "---",
           score: r.score ?? 0,
@@ -328,7 +334,7 @@ window.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ name: validName, score: newScore })
       });
     } catch (err) {
-      highScores.push({ name: validName, score: newScore, date: 'Just now' });
+      highScores.push({ name: validName, score: newScore, date: '--' });
       highScores.sort((a, b) => b.score - a.score);
       highScores = highScores.slice(0, 15);
       localStorage.setItem('pixeljump_top15_cache', JSON.stringify(highScores));
