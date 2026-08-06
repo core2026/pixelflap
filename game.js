@@ -1,10 +1,10 @@
 /**
  * PixelJump Engine
- * Version: 1.10.0 (All Items Restored: Slow-Mo, Gems, Shield, Sword Combo, Styled Arrows & Guide)
+ * Version: 1.11.0 (Required Initials, Menu Navigation at Game Over, Full Top-15 Leaderboard Fix)
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v1.10.0";
+  const GAME_VERSION = "v1.11.0";
   const canvas = document.getElementById('gameCanvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -13,7 +13,8 @@ window.addEventListener('DOMContentLoaded', () => {
   // 1. STATE & LEADERBOARD DATA
   // ==========================================
   let score = 0;
-  let playerInitials = localStorage.getItem('pixeljump_initials') || "AAA";
+  // Default to empty so user is forced to enter initials
+  let playerInitials = localStorage.getItem('pixeljump_initials') || ""; 
   let highScores = JSON.parse(localStorage.getItem('pixeljump_top15')) || [
     { name: "ACE", score: 50 },
     { name: "JMP", score: 35 },
@@ -135,18 +136,28 @@ window.addEventListener('DOMContentLoaded', () => {
   let particles = [];
   let floatingTexts = [];
 
+  // Enforces valid 1-3 letter initials
   function promptForInitials() {
-    let input = prompt("Enter your Initials (1 to 3 letters):", playerInitials);
+    let input = prompt("Required: Enter your Initials (1 to 3 letters):", playerInitials || "");
     if (input !== null) {
       const sanitized = input.replace(/[^a-zA-Z]/g, '').toUpperCase().trim();
       if (sanitized.length >= 1 && sanitized.length <= 3) {
         playerInitials = sanitized;
         localStorage.setItem('pixeljump_initials', playerInitials);
+        return true;
       } else {
-        alert("Please enter between 1 and 3 letters!");
-        promptForInitials();
+        alert("Initials are required! Please enter 1 to 3 letters.");
+        return promptForInitials();
       }
     }
+    return false;
+  }
+
+  function ensureInitialsSet() {
+    if (!playerInitials || playerInitials.trim().length === 0) {
+      return promptForInitials();
+    }
+    return true;
   }
 
   // ==========================================
@@ -197,9 +208,9 @@ window.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // Start Button Click Zone (y: 500-552)
-      if (clickX >= 70 && clickX <= 330 && clickY >= 500 && clickY <= 552) {
-        if (!playerInitials) promptForInitials();
+      // Start Button Click Zone (y: 520-565)
+      if (clickX >= 70 && clickX <= 330 && clickY >= 520 && clickY <= 565) {
+        if (!ensureInitialsSet()) return;
         initAudio();
         gameStarted = true;
         resetGame();
@@ -209,7 +220,18 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     if (gameOver) {
-      resetGame();
+      // Game Over: Main Menu Button (y: 525-565, left)
+      if (clickX >= 30 && clickX <= 190 && clickY >= 525 && clickY <= 565) {
+        gameStarted = false;
+        gameOver = false;
+        return;
+      }
+
+      // Game Over: Replay Button (y: 525-565, right)
+      if (clickX >= 210 && clickX <= 370 && clickY >= 525 && clickY <= 565) {
+        resetGame();
+        return;
+      }
       return;
     }
 
@@ -226,7 +248,7 @@ window.addEventListener('DOMContentLoaded', () => {
         return;
       }
       if (!gameStarted) {
-        if (!playerInitials) promptForInitials();
+        if (!ensureInitialsSet()) return;
         initAudio();
         gameStarted = true;
         resetGame();
@@ -327,7 +349,8 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function saveHighScore(newScore) {
-    highScores.push({ name: playerInitials, score: newScore });
+    const validName = playerInitials || "AAA";
+    highScores.push({ name: validName, score: newScore });
     highScores.sort((a, b) => b.score - a.score);
     highScores = highScores.slice(0, 15);
     localStorage.setItem('pixeljump_top15', JSON.stringify(highScores));
@@ -545,27 +568,30 @@ window.addEventListener('DOMContentLoaded', () => {
     ctx.restore();
   }
 
+  // Render Full Top-15 High Scores Leaderboard
   function drawLeaderboardCard(startY, title) {
     const width = 340;
-    const height = 310;
+    const height = 350;
     const x = (canvas.width - width) / 2;
 
-    ctx.fillStyle = "rgba(20, 20, 25, 0.9)";
+    ctx.fillStyle = "rgba(20, 20, 25, 0.92)";
     ctx.fillRect(x, startY, width, height);
     ctx.strokeStyle = "rgba(255, 215, 0, 0.5)";
     ctx.lineWidth = 2;
     ctx.strokeRect(x, startY, width, height);
 
     ctx.fillStyle = "#ffd700";
-    ctx.font = "bold 16px sans-serif";
+    ctx.font = "bold 15px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(title, canvas.width / 2, startY + 28);
+    ctx.fillText(title, canvas.width / 2, startY + 24);
 
-    const displayScores = highScores.slice(0, 10);
-    let rowY = startY + 58;
+    // Dynamic sizing to comfortably fit all 15 entries
+    const displayScores = highScores.slice(0, 15);
+    let rowY = startY + 44;
+    const rowStep = 19; 
 
     displayScores.forEach((hs, idx) => {
-      ctx.font = "bold 14px sans-serif";
+      ctx.font = "bold 12px sans-serif";
 
       if (idx === 0) ctx.fillStyle = "#ffd700";
       else if (idx === 1) ctx.fillStyle = "#e0e0e0";
@@ -573,15 +599,15 @@ window.addEventListener('DOMContentLoaded', () => {
       else ctx.fillStyle = "#b0bec5";
 
       ctx.textAlign = "left";
-      ctx.fillText(`#${idx + 1}`, x + 25, rowY);
+      ctx.fillText(`#${idx + 1}`, x + 20, rowY);
 
       ctx.fillStyle = (hs.name === playerInitials) ? "#00e676" : "#ffffff";
-      ctx.fillText(hs.name, x + 85, rowY);
+      ctx.fillText(hs.name, x + 75, rowY);
 
       ctx.textAlign = "right";
-      ctx.fillText(`${hs.score} pts`, x + width - 25, rowY);
+      ctx.fillText(`${hs.score} pts`, x + width - 20, rowY);
 
-      rowY += 24;
+      rowY += rowStep;
     });
   }
 
@@ -751,7 +777,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     ctx.font = "12px sans-serif";
     ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
-    ctx.fillText(`Player: ${playerInitials}`, 15, 48);
+    ctx.fillText(`Player: ${playerInitials || "---"}`, 15, 48);
     ctx.fillText(`${currentTheme.name} Theme`, canvas.width - 100, 38);
     ctx.fillText(GAME_VERSION, canvas.width - 55, 20);
 
@@ -805,13 +831,14 @@ window.addEventListener('DOMContentLoaded', () => {
       // Interactive Initials Box
       ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
       ctx.fillRect(50, 60, 300, 40);
-      ctx.strokeStyle = "#ffd700";
+      ctx.strokeStyle = playerInitials ? "#ffd700" : "#ff5252";
       ctx.lineWidth = 1.5;
       ctx.strokeRect(50, 60, 300, 40);
 
-      ctx.fillStyle = "#ffd700";
+      ctx.fillStyle = playerInitials ? "#ffd700" : "#ff5252";
       ctx.font = "bold 14px sans-serif";
-      ctx.fillText(`INITIALS: [ ${playerInitials} ] (Tap to Change)`, canvas.width / 2, 85);
+      const initialsLabel = playerInitials ? `INITIALS: [ ${playerInitials} ] (Tap to Change)` : "⚠️ TAP TO ENTER INITIALS (REQUIRED)";
+      ctx.fillText(initialsLabel, canvas.width / 2, 85);
 
       // Interactive Avatar Box with Stylized Glowing Arrows
       ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
@@ -819,14 +846,14 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.strokeStyle = "#00e676";
       ctx.strokeRect(50, 110, 300, 40);
 
-      // Left Stylized Arrow Button Box
+      // Left Arrow
       ctx.fillStyle = "#1b5e20";
       ctx.fillRect(52, 112, 38, 36);
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 18px sans-serif";
       ctx.fillText("⟨", 71, 136);
 
-      // Right Stylized Arrow Button Box
+      // Right Arrow
       ctx.fillStyle = "#1b5e20";
       ctx.fillRect(310, 112, 38, 36);
       ctx.fillStyle = "#ffffff";
@@ -838,14 +865,14 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.font = "bold 14px sans-serif";
       ctx.fillText(`AVATAR: ${customAvatarImg ? 'Custom 📁' : currentAvatar.emoji + ' ' + currentAvatar.name}`, canvas.width / 2, 135);
 
-      // Leaderboard
-      drawLeaderboardCard(165, "🏆 HALL OF FAME 🏆");
+      // Leaderboard Top 15
+      drawLeaderboardCard(160, "🏆 TOP 15 HALL OF FAME 🏆");
 
-      // TAP TO START BUTTON (PERFECTLY CENTER ALIGNED)
+      // TAP TO START BUTTON
       const btnX = 70;
-      const btnY = 500;
+      const btnY = 520;
       const btnWidth = 260;
-      const btnHeight = 52;
+      const btnHeight = 45;
 
       ctx.fillStyle = "#2e7d32";
       ctx.fillRect(btnX, btnY, btnWidth, btnHeight);
@@ -854,36 +881,63 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.strokeRect(btnX, btnY, btnWidth, btnHeight);
 
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 18px sans-serif";
+      ctx.font = "bold 17px sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText("TAP TO START", btnX + (btnWidth / 2), btnY + (btnHeight / 2));
-      ctx.textBaseline = "alphabetic"; // Reset baseline
+      ctx.textBaseline = "alphabetic";
       ctx.textAlign = "left";
     }
 
     // ==========================================
-    // GAME OVER SCREEN
+    // GAME OVER SCREEN WITH MAIN MENU OPTION
     // ==========================================
     if (gameOver) {
       ctx.fillStyle = "rgba(0, 0, 0, 0.88)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.fillStyle = "#ff5252";
-      ctx.font = "bold 28px sans-serif";
+      ctx.font = "bold 26px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("GAME OVER", canvas.width / 2, 45);
+      ctx.fillText("GAME OVER", canvas.width / 2, 38);
 
       ctx.fillStyle = "#ffffff";
-      ctx.font = "15px sans-serif";
-      ctx.fillText(`Final Score (${playerInitials}): ${score} pts`, canvas.width / 2, 72);
+      ctx.font = "14px sans-serif";
+      ctx.fillText(`Final Score (${playerInitials || "AAA"}): ${score} pts`, canvas.width / 2, 60);
 
-      drawLeaderboardCard(90, "🏅 TOP SCORES LEADERBOARD 🏅");
+      // Full Top 15 Leaderboard
+      drawLeaderboardCard(80, "🏅 TOP 15 SCORES LEADERBOARD 🏅");
 
-      ctx.fillStyle = "#00e676";
-      ctx.font = "bold 16px sans-serif";
+      // Game Over Action Buttons (Menu vs Replay)
+      const btnW = 160;
+      const btnH = 40;
+      const btnY = 525;
+
+      // 1. Main Menu Button (Left)
+      ctx.fillStyle = "#424242";
+      ctx.fillRect(30, btnY, btnW, btnH);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(30, btnY, btnW, btnH);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 13px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("Tap Screen or Press Space to Play Again", canvas.width / 2, 530);
+      ctx.textBaseline = "middle";
+      ctx.fillText("↩️ MAIN MENU", 30 + (btnW / 2), btnY + (btnH / 2));
+
+      // 2. Replay Button (Right)
+      ctx.fillStyle = "#2e7d32";
+      ctx.fillRect(210, btnY, btnW, btnH);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(210, btnY, btnW, btnH);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 13px sans-serif";
+      ctx.fillText("🔄 REPLAY", 210 + (btnW / 2), btnY + (btnH / 2));
+
+      ctx.textBaseline = "alphabetic";
       ctx.textAlign = "left";
     }
 
