@@ -206,6 +206,65 @@ const finalScoreEl = document.getElementById('final-score');
 const bestScoreEl = document.getElementById('best-score');
 const startBtn = document.getElementById('start-btn');
 const retryBtn = document.getElementById('retry-btn');
+const initialsEntry = document.getElementById('initials-entry');
+const initialsInput = document.getElementById('initials-input');
+const saveScoreBtn = document.getElementById('save-score-btn');
+const leaderboardList = document.getElementById('leaderboard-list');
+
+const LEADERBOARD_KEY = 'pixelflap-leaderboard';
+const MAX_LEADERBOARD_ENTRIES = 10;
+
+function loadLeaderboard() {
+  try {
+    const stored = localStorage.getItem(LEADERBOARD_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLeaderboard(entries) {
+  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(entries));
+}
+
+function addLeaderboardEntry(initials, entryScore) {
+  const entries = loadLeaderboard();
+  entries.push({
+    initials: initials || '---',
+    score: entryScore,
+    date: new Date().toISOString()
+  });
+  entries.sort((a, b) => b.score - a.score);
+  const trimmed = entries.slice(0, MAX_LEADERBOARD_ENTRIES);
+  saveLeaderboard(trimmed);
+  return trimmed;
+}
+
+function formatDate(isoString) {
+  const d = new Date(isoString);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
+    ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+function renderLeaderboard() {
+  const entries = loadLeaderboard();
+  leaderboardList.innerHTML = '';
+  if (entries.length === 0) {
+    const li = document.createElement('li');
+    li.textContent = 'no scores yet';
+    leaderboardList.appendChild(li);
+    return;
+  }
+  entries.forEach(entry => {
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <span class="lb-initials">${entry.initials}</span>
+      <span>${entry.score}</span>
+      <span class="lb-date">${formatDate(entry.date)}</span>
+    `;
+    leaderboardList.appendChild(li);
+  });
+}
 
 function getCharacter() {
   return CHARACTERS[ACTIVE_CHARACTER];
@@ -261,6 +320,13 @@ function flap() {
 }
 
 function startGame() {
+  // Re-derive the active character straight from the DOM at the moment
+  // play is pressed, rather than trusting only the in-memory variable.
+  const selectedOption = document.querySelector('.char-option.selected');
+  if (selectedOption) {
+    ACTIVE_CHARACTER = selectedOption.dataset.character;
+  }
+
   resetGame();
   state = 'playing';
   startScreen.classList.add('hidden');
@@ -274,6 +340,11 @@ function endGame() {
   finalScoreEl.textContent = `score: ${score}`;
   bestScoreEl.textContent = `best: ${bestScore}`;
   gameOverScreen.classList.remove('hidden');
+
+  initialsEntry.classList.remove('hidden');
+  initialsInput.value = '';
+  renderLeaderboard();
+  setTimeout(() => initialsInput.focus(), 0);
 }
 
 function update() {
@@ -398,6 +469,31 @@ document.addEventListener('keydown', (e) => {
 
 startBtn.addEventListener('click', startGame);
 retryBtn.addEventListener('click', startGame);
+
+// ============================================================
+// HIGH SCORE / INITIALS ENTRY
+// ============================================================
+initialsInput.addEventListener('input', () => {
+  // strip anything that isn't a letter, cap at 3 chars, force uppercase
+  initialsInput.value = initialsInput.value
+    .toUpperCase()
+    .replace(/[^A-Z]/g, '')
+    .slice(0, 3);
+});
+
+initialsInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    saveScoreBtn.click();
+  }
+});
+
+saveScoreBtn.addEventListener('click', () => {
+  const initials = initialsInput.value || 'YOU';
+  addLeaderboardEntry(initials, score);
+  renderLeaderboard();
+  initialsEntry.classList.add('hidden');
+});
 
 // ============================================================
 // INIT
