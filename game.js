@@ -32,12 +32,11 @@ let playerInitials = "ACE";
 let selectedAvatar = "🚀";
 let customImageObj = null;
 
-// Player Settings
+// Dynamic Player Avatar Settings (Scales naturally on mobile/desktop)
 const player = {
   x: 60,
   y: 250,
-  width: 32,
-  height: 32,
+  size: 44, // Avatar size in px
   gravity: 0.45,
   jump: -7.5,
   velocity: 0
@@ -48,6 +47,59 @@ let pipes = [];
 let stars = [];      // Bonus floating star collectibles (+5 pts)
 let debris = [];     // Background space dust/asteroids
 let particles = [];  // Trail particles
+
+// --- WEB AUDIO API SYNTHESIZER ---
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new AudioCtx();
+  }
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+}
+
+function playSound(type) {
+  if (!audioCtx) return;
+
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  const now = audioCtx.currentTime;
+
+  if (type === "jump") {
+    // Rising Pitch Jump Chime
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(160, now);
+    osc.frequency.exponentialRampToValueAtTime(440, now + 0.1);
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  } else if (type === "star") {
+    // Double Star Collectible Tone (C5 to E5)
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(523.25, now);
+    osc.frequency.setValueAtTime(659.25, now + 0.08);
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    osc.start(now);
+    osc.stop(now + 0.2);
+  } else if (type === "crash") {
+    // Low Frequency Drop (Crash)
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(130, now);
+    osc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+    osc.start(now);
+    osc.stop(now + 0.3);
+  }
+}
 
 // Initialize Controls & Avatars
 avatarBtns.forEach(btn => {
@@ -76,16 +128,20 @@ customAvatarInput.addEventListener("change", (e) => {
 });
 
 function jump() {
+  initAudio();
+
   if (gameState === "PLAYING") {
     player.velocity = player.jump;
+    playSound("jump");
+
     // Spawn jump trail particles
-    for(let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       particles.push({
         x: player.x + 10,
-        y: player.y + player.height,
+        y: player.y + player.size,
         vx: (Math.random() - 0.5) * 2 - 2,
         vy: Math.random() * 2 + 1,
-        life: 15,
+        life: 18,
         color: currentTheme.pipe
       });
     }
@@ -95,15 +151,22 @@ function jump() {
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space" || e.code === "ArrowUp") jump();
 });
+
 canvas.addEventListener("touchstart", (e) => {
   e.preventDefault();
   jump();
-});
+}, { passive: false });
+
 canvas.addEventListener("mousedown", jump);
 
 // Start / Restart Handlers
-startBtn.addEventListener("click", startGame);
+startBtn.addEventListener("click", () => {
+  initAudio();
+  startGame();
+});
+
 restartBtn.addEventListener("click", () => {
+  initAudio();
   gameOverScreen.classList.add("hidden");
   startGame();
 });
@@ -125,11 +188,11 @@ function startGame() {
 
   // Initialize background ambient space debris
   debris = [];
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 22; i++) {
     debris.push({
       x: Math.random() * canvas.width,
       y: Math.random() * canvas.height,
-      size: Math.random() * 2 + 1,
+      size: Math.random() * 2.5 + 1,
       speed: Math.random() * 1.5 + 0.5
     });
   }
@@ -153,7 +216,7 @@ function update() {
   player.y += player.velocity;
 
   // Floor / Ceiling collisions
-  if (player.y + player.height >= canvas.height || player.y <= 0) {
+  if (player.y + player.size >= canvas.height || player.y <= 0) {
     triggerGameOver();
   }
 
@@ -165,7 +228,7 @@ function update() {
 
   // Spawn Obstacles (Pipes)
   if (frames % 90 === 0) {
-    const gap = 130;
+    const gap = 140;
     const minTop = 40;
     const maxTop = canvas.height - gap - 60;
     const topHeight = Math.floor(Math.random() * (maxTop - minTop + 1)) + minTop;
@@ -182,7 +245,7 @@ function update() {
       stars.push({
         x: canvas.width + 25,
         y: topHeight + gap / 2,
-        size: 12,
+        size: 14,
         collected: false
       });
     }
@@ -195,8 +258,8 @@ function update() {
     // Collision Check
     if (
       player.x < p.x + 45 &&
-      player.x + player.width > p.x &&
-      (player.y < p.top || player.y + player.height > canvas.height - p.bottom)
+      player.x + player.size > p.x &&
+      (player.y < p.top || player.y + player.size > canvas.height - p.bottom)
     ) {
       triggerGameOver();
     }
@@ -214,9 +277,12 @@ function update() {
   // Update Star Collectibles (+5 points)
   stars.forEach(s => {
     s.x -= 2.5;
-    if (!s.collected && Math.hypot(player.x - s.x, player.y - s.y) < 25) {
+    const playerCenterX = player.x + player.size / 2;
+    const playerCenterY = player.y + player.size / 2;
+    if (!s.collected && Math.hypot(playerCenterX - s.x, playerCenterY - s.y) < player.size / 2 + s.size) {
       s.collected = true;
       score += 5; // Bonus Points!
+      playSound("star");
     }
   });
   stars = stars.filter(s => s.x > -20 && !s.collected);
@@ -247,7 +313,7 @@ function render() {
   particles.forEach(pt => {
     ctx.fillStyle = pt.color;
     ctx.beginPath();
-    ctx.arc(pt.x, pt.y, 2, 0, Math.PI * 2);
+    ctx.arc(pt.x, pt.y, 2.5, 0, Math.PI * 2);
     ctx.fill();
   });
 
@@ -268,23 +334,48 @@ function render() {
 
   // Render Star Collectibles
   stars.forEach(s => {
+    ctx.save();
     ctx.fillStyle = "#ffd700";
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowBlur = 10;
+    ctx.shadowBlur = 12;
     ctx.shadowColor = "#ffd700";
+    ctx.restore();
   });
-  ctx.shadowBlur = 0; // Reset shadow
 
   // Render Player / Avatar
   if (customImageObj) {
-    ctx.drawImage(customImageObj, player.x, player.y, player.width, player.height);
+    ctx.save();
+    const centerX = player.x + player.size / 2;
+    const centerY = player.y + player.size / 2;
+    const radius = player.size / 2;
+
+    // Create Circular Clip Frame
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2, true);
+    ctx.closePath();
+    ctx.clip();
+
+    // Draw Image inside Frame
+    ctx.drawImage(customImageObj, player.x, player.y, player.size, player.size);
+    ctx.restore();
+
+    // Draw Cyan Glowing Border Ring around Custom Image
+    ctx.save();
+    ctx.strokeStyle = "#00e5ff";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
   } else {
-    ctx.font = "28px sans-serif";
+    // Emoji Avatar Rendering
+    ctx.font = `${player.size}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(selectedAvatar, player.x + player.width / 2, player.y + player.height / 2);
+    ctx.fillText(selectedAvatar, player.x + player.size / 2, player.y + player.size / 2);
   }
 
   // Render Live Score Counter
@@ -299,6 +390,7 @@ function render() {
 // Game Over & Leaderboard Handling
 function triggerGameOver() {
   gameState = "GAMEOVER";
+  playSound("crash");
   container.classList.add("shake");
   setTimeout(() => container.classList.remove("shake"), 300);
 
