@@ -2,98 +2,113 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <!-- Mobile Viewport & Fullscreen Setup -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   
-  <!-- Method 2: HTTP Cache Control Meta Tags (Forces devices to fetch fresh HTML) -->
+  <!-- Cache Control Meta Tags -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 
   <title>PixelJump</title>
-
-  <!-- Method 1: Cache-Busting Version Strings (Increment ?v=1.1 to ?v=1.2 when updating files) -->
-  <link rel="stylesheet" href="style.css?v=1.1">
+  <link rel="stylesheet" href="style.css?v=1.2">
 </head>
 <body>
 
   <div id="game-container">
-    <!-- Game Canvas -->
-    <canvas id="gameCanvas"></canvas>
-
-    <!-- UI Overlay Controls -->
-    <button id="info-btn" aria-label="Game Rules and Info">❓ Info</button>
-
-    <!-- Start / Character Customization Screen -->
+    <!-- Start Screen Overlay -->
     <div id="start-screen" class="overlay">
-      <div class="card">
-        <h1>PIXEL JUMP</h1>
-        <p class="subtitle">Cosmic Tap Runner</p>
+      <h1 class="title">PIXELJUMP</h1>
 
-        <div class="input-group">
-          <label for="player-initials">ENTER YOUR INITIALS (1-3 CHARS)</label>
-          <input type="text" id="player-initials" maxlength="3" placeholder="AAA" autocomplete="off" spellcheck="false" dir="ltr">
-        </div>
-
-        <div class="avatar-selection">
-          <p class="section-label">CHOOSE YOUR AVATAR</p>
-          <div class="avatar-grid">
-            <button class="avatar-btn active" data-avatar="🚀">🚀</button>
-            <button class="avatar-btn" data-avatar="🛸">🛸</button>
-            <button class="avatar-btn" data-avatar="👾">👾</button>
-            <button class="avatar-btn" data-avatar="🤖">🤖</button>
-            <button class="avatar-btn" data-avatar="🐱‍🚀">🐱‍🚀</button>
-          </div>
-          
-          <div class="custom-avatar-upload">
-            <label for="custom-avatar-input" class="upload-btn">📁 Upload Custom Image</label>
-            <input type="file" id="custom-avatar-input" accept="image/*">
-          </div>
-        </div>
-
-        <button id="start-btn" class="primary-btn">START GAME</button>
+      <div class="input-group">
+        <label for="player-initials">Player Initials (1-3 Letters)</label>
+        <input type="text" id="player-initials" maxlength="3" value="" placeholder="AAA" autocomplete="off">
       </div>
-    </div>
 
-    <!-- Game Over Screen & Leaderboard -->
-    <div id="game-over-screen" class="overlay hidden">
-      <div class="card">
-        <h2 class="danger-text">GAME OVER</h2>
-        <p id="final-score">Final Score: 0</p>
-
-        <div class="leaderboard-box">
-          <h3>TOP ASTRONAUTS</h3>
-          <ol id="leaderboard-list">
-            <li class="loading">Loading leaderboard...</li>
-          </ol>
-        </div>
-
-        <div class="button-group">
-          <button id="restart-btn" class="primary-btn">PLAY AGAIN</button>
-          <button id="change-char-btn" class="secondary-btn">CHANGE CHARACTER</button>
+      <div class="input-group">
+        <label>Choose Avatar</label>
+        <div class="avatar-selector">
+          <button class="avatar-btn active" data-avatar="🚀"><span>🚀</span></button>
+          <button class="avatar-btn" data-avatar="👾"><span>👾</span></button>
+          <button class="avatar-btn" data-avatar="🛸"><span>🛸</span></button>
+          <button class="avatar-btn" data-avatar="🤖"><span>🤖</span></button>
+          <button class="avatar-btn" data-avatar="🐱‍🚀"><span>🐱‍🚀</span></button>
         </div>
       </div>
+
+      <div class="input-group">
+        <label for="custom-avatar-input">Or Upload Custom Photo</label>
+        <input type="file" id="custom-avatar-input" accept="image/*">
+      </div>
+
+      <button id="info-btn" class="btn secondary-btn">📖 HOW TO PLAY / INFO</button>
+      <button id="start-btn" class="btn">LAUNCH GAME</button>
     </div>
 
-    <!-- Info / How to Play Modal -->
+    <!-- Power-Ups & Hazards Info Modal -->
     <div id="info-modal" class="overlay hidden">
-      <div class="card info-card">
-        <h2>HOW TO PLAY</h2>
-        <ul class="rules-list">
-          <li><strong>Space / Arrow Up / Tap Screen:</strong> Jump / Thrust upward.</li>
-          <li><strong>Pipes:</strong> Avoid colliding with top & bottom obstacles. Gap gets tighter as score increases!</li>
-          <li><strong>⭐ Stars:</strong> Collect for +5 Bonus Points (+10 with 2x score active).</li>
-          <li><strong>🛡️ Shield:</strong> Absorbs one collision with a pipe, comet, or boundary.</li>
-          <li><strong>⏱️ Slow-Mo:</strong> Temporarily slows down overall speed for 5 seconds.</li>
-          <li><strong>⚡ 2X Score:</strong> Doubles points for pipes and stars for 6 seconds.</li>
-          <li><strong>☄️ Comets:</strong> Red moving hazards starting at score 12!</li>
-        </ul>
-        <button id="close-info-btn" class="primary-btn">GOT IT!</button>
+      <h2 class="modal-title">POWER-UPS & HAZARDS</h2>
+
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="icon">🛡️</span>
+          <div>
+            <strong>Shield</strong>
+            <small>Absorbs 1 hit</small>
+          </div>
+        </div>
+        <div class="info-item">
+          <span class="icon">⏱️</span>
+          <div>
+            <strong>Slow-Mo</strong>
+            <small>50% game speed</small>
+          </div>
+        </div>
+        <div class="info-item">
+          <span class="icon">⚡</span>
+          <div>
+            <strong>2X Score</strong>
+            <small>Double points</small>
+          </div>
+        </div>
+        <div class="info-item">
+          <span class="icon">⭐</span>
+          <div>
+            <strong>Star</strong>
+            <small>+5 bonus pts</small>
+          </div>
+        </div>
+        <div class="info-item full-width">
+          <span class="icon">☄️</span>
+          <div>
+            <strong>Moving Obstacles & Comets</strong>
+            <small>Spawn dynamically at higher scores!</small>
+          </div>
+        </div>
       </div>
+
+      <button id="close-info-btn" class="btn">CLOSE</button>
     </div>
+
+    <!-- Game Over Screen Overlay -->
+    <div id="game-over-screen" class="overlay hidden">
+      <h1 class="title" style="color: #ff1744;">GAME OVER</h1>
+      <p id="final-score">Final Score: 0</p>
+
+      <div id="leaderboard-box">
+        <h3>Top Astronauts</h3>
+        <ul id="leaderboard-list">
+          <li class="loading">Loading scores...</li>
+        </ul>
+      </div>
+
+      <button id="restart-btn" class="btn">PLAY AGAIN</button>
+      <button id="change-char-btn" class="btn secondary-btn">🚀 CHANGE AVATAR / INITIALS</button>
+    </div>
+
+    <!-- Main Canvas -->
+    <canvas id="gameCanvas"></canvas>
   </div>
 
-  <!-- Method 1: Cache-Busting Version String on game.js -->
-  <script src="game.js?v=1.1"></script>
+  <script src="game.js?v=1.2"></script>
 </body>
 </html>

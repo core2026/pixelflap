@@ -47,6 +47,7 @@ let frames = 0;
 let playerInitials = "";
 let selectedAvatar = "🚀";
 let customImageObj = null;
+let lastPipeTop = null; // Used for smooth pipe delta trajectory
 
 // Dynamic Player Avatar Settings
 const player = {
@@ -309,6 +310,7 @@ function startGame() {
   popups = [];
   score = 0;
   frames = 0;
+  lastPipeTop = null;
 
   debris = [];
   for (let i = 0; i < 22; i++) {
@@ -344,8 +346,8 @@ function update() {
   if (isSlowMo) activePowerUps.slowMoTimer--;
   if (activePowerUps.doubleScoreTimer > 0) activePowerUps.doubleScoreTimer--;
 
-  // Dynamic Base Speed: Starts at 2.0, scales up to 3.2 as score increases
-  const baseSpeed = Math.min(2.0 + score * 0.04, 3.2);
+  // Smooth base speed progression
+  const baseSpeed = Math.min(2.1 + score * 0.03, 3.1);
   const speedMult = isSlowMo ? 0.55 : 1.0;
   const gameSpeed = baseSpeed * speedMult;
 
@@ -373,20 +375,31 @@ function update() {
     if (d.x < 0) d.x = canvas.width;
   });
 
-  const spawnRate = isSlowMo ? 120 : 90;
+  // Balanced spawn distance between pipes
+  const spawnRate = isSlowMo ? 140 : 105;
   if (frames % spawnRate === 0) {
-    // Dynamic Gap: Starts wide (190px) for beginners and shrinks to 135px as score increases
-    const gap = Math.max(190 - score * 2, 135);
-    const minTop = 40;
-    const maxTop = canvas.height - gap - 60;
-    const topHeight = Math.floor(Math.random() * (maxTop - minTop + 1)) + minTop;
+    const gap = Math.max(195 - score * 2, 140);
+    const minTop = 50;
+    const maxTop = canvas.height - gap - 70;
+    
+    let topHeight;
+    if (lastPipeTop === null) {
+      topHeight = Math.floor(Math.random() * (maxTop - minTop + 1)) + minTop;
+    } else {
+      // FIX: Clamp maximum vertical shift to 120px from previous pipe gap
+      const maxDelta = 120;
+      const targetMin = Math.max(minTop, lastPipeTop - maxDelta);
+      const targetMax = Math.min(maxTop, lastPipeTop + maxDelta);
+      topHeight = Math.floor(Math.random() * (targetMax - targetMin + 1)) + targetMin;
+    }
+    lastPipeTop = topHeight;
 
     pipes.push({
       x: canvas.width,
       top: topHeight,
       bottom: canvas.height - topHeight - gap,
       passed: false,
-      isMoving: score >= 15 && Math.random() < 0.4,
+      isMoving: score >= 16 && Math.random() < 0.35,
       offset: 0,
       dir: 1
     });
@@ -401,7 +414,7 @@ function update() {
     }
   }
 
-  if (score >= 12 && frames % 260 === 0 && Math.random() < 0.5) {
+  if (score >= 15 && frames % 280 === 0 && Math.random() < 0.45) {
     comets.push({
       x: canvas.width + 30,
       y: Math.random() * (canvas.height - 150) + 50,

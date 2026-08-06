@@ -99,7 +99,6 @@ canvas {
   text-align: center;
 }
 
-/* Power-Ups Info Modal Items */
 .info-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -184,18 +183,29 @@ input[type="text"].invalid {
 
 .avatar-selector {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .avatar-btn {
-  font-size: 1.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  font-size: 1.5rem;
   background: #14192b;
   border: 1px solid #2a334d;
-  padding: 8px 12px;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+.avatar-btn span {
+  pointer-events: none;
+  display: inline-block;
+  line-height: 1;
 }
 
 .avatar-btn.active, .avatar-btn:hover {
@@ -205,8 +215,13 @@ input[type="text"].invalid {
 }
 
 input[type="file"] {
-  font-size: 0.8rem;
+  width: 100%;
+  font-size: 0.85rem;
   color: #a0aab8;
+  padding: 8px;
+  background: #14192b;
+  border: 1px dashed #2a334d;
+  border-radius: 6px;
 }
 
 .btn {
