@@ -36,24 +36,44 @@ const CHARACTERS = {
     }
   },
 
-  pac: {
+  star: {
     radius: 16,
     draw(ctx, x, y, radius, rotation) {
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(rotation);
 
-      // mouth angle animates a bit based on rotation so it "chomps" as it flaps
-      const mouthOpen = 0.25 + Math.abs(Math.sin(Date.now() / 100)) * 0.25;
+      const spikes = 5;
+      const outerR = radius;
+      const innerR = radius * 0.5;
 
-      ctx.fillStyle = '#f6d33c';
+      ctx.fillStyle = '#f9d84a';
       ctx.strokeStyle = '#1e2327';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(0, 0, radius, mouthOpen * Math.PI, (2 - mouthOpen) * Math.PI);
-      ctx.lineTo(0, 0);
+      for (let i = 0; i < spikes * 2; i++) {
+        const r = i % 2 === 0 ? outerR : innerR;
+        const angle = (Math.PI / spikes) * i - Math.PI / 2;
+        const px = Math.cos(angle) * r;
+        const py = Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
+
+      // face
+      ctx.fillStyle = '#1e2327';
+      ctx.beginPath();
+      ctx.arc(-radius * 0.22, -radius * 0.05, radius * 0.09, 0, Math.PI * 2);
+      ctx.arc(radius * 0.22, -radius * 0.05, radius * 0.09, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#1e2327';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, radius * 0.05, radius * 0.22, 0.15 * Math.PI, 0.85 * Math.PI);
       ctx.stroke();
 
       ctx.restore();
@@ -160,7 +180,7 @@ const CHARACTERS = {
   }
 };
 
-const DEFAULT_CHARACTER = 'pac';
+const DEFAULT_CHARACTER = 'star';
 let ACTIVE_CHARACTER = localStorage.getItem('pixelflap-character') || DEFAULT_CHARACTER;
 
 // ============================================================
@@ -337,20 +357,10 @@ function loop() {
 // ============================================================
 const charOptions = document.querySelectorAll('.char-option');
 
-function renderCharacterPreviews() {
-  charOptions.forEach(option => {
-    const key = option.dataset.character;
-    const previewCanvas = option.querySelector('.char-preview');
-    const pctx = previewCanvas.getContext('2d');
-    pctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-    CHARACTERS[key].draw(
-      pctx,
-      previewCanvas.width / 2,
-      previewCanvas.height / 2,
-      18,
-      0
-    );
-  });
+function selectCharacter(key) {
+  ACTIVE_CHARACTER = key;
+  localStorage.setItem('pixelflap-character', ACTIVE_CHARACTER);
+  markSelectedOption();
 }
 
 function markSelectedOption() {
@@ -360,17 +370,14 @@ function markSelectedOption() {
 }
 
 charOptions.forEach(option => {
-  option.addEventListener('click', () => {
-    ACTIVE_CHARACTER = option.dataset.character;
-    localStorage.setItem('pixelflap-character', ACTIVE_CHARACTER);
-    markSelectedOption();
+  option.addEventListener('click', () => selectCharacter(option.dataset.character));
+  option.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      selectCharacter(option.dataset.character);
+    }
   });
 });
-
-// re-render previews continuously so the pac muncher animates on the select screen
-setInterval(() => {
-  if (state === 'idle') renderCharacterPreviews();
-}, 100);
 
 // ============================================================
 // INPUT
@@ -397,7 +404,6 @@ retryBtn.addEventListener('click', startGame);
 // ============================================================
 loadBestScore();
 resetGame();
-renderCharacterPreviews();
 markSelectedOption();
 draw();
 loop();
