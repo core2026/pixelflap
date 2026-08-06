@@ -1,24 +1,24 @@
 /**
  * PixelJump Engine
- * Version: 1.5.0 (Dynamic Pipe Themes, Safe Item Spawning & Default Shield)
+ * Version: 1.6.0 (Splash Screen, Giant Shield Rampage, Fixed Responsive Canvas, Randomized Items)
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v1.5.0";
+  const GAME_VERSION = "v1.6.0";
   const canvas = document.getElementById('gameCanvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
 
   // ==========================================
-  // 1. STATE & DYNAMIC THEMES
+  // 1. STATE & THEMES
   // ==========================================
   let score = 0;
-  let highScore = localStorage.getItem('pixeljump_highscore') || 0;
+  let highScore = parseInt(localStorage.getItem('pixeljump_highscore')) || 0;
+  let gameStarted = false; // Restored Splash Screen State
   let gameOver = false;
   let frameCount = 0;
   let audioMuted = false;
 
-  // Fully distinct theme palettes for backgrounds AND pipes
   const THEMES = {
     day: {
       name: 'Day',
@@ -115,21 +115,15 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // 3. PLAYER & INITIAL STATE
+  // 3. PLAYER & GIANT AEGIS POWERUP
   // ==========================================
   const CHARACTERS = {
-    cat: { id: 'cat', name: 'Cat', color: '#ff9800', src: 'cat.png', loaded: false, sprite: new Image() },
-    rocket: { id: 'rocket', name: 'Rocket', color: '#e91e63', src: 'rocket.png', loaded: false, sprite: new Image() }
+    cat: { id: 'cat', name: 'Cat', color: '#ff9800', src: 'cat.png', loaded: false, sprite: new Image() }
   };
 
-  Object.keys(CHARACTERS).forEach(key => {
-    const char = CHARACTERS[key];
-    char.sprite.onload = () => { char.loaded = true; };
-    char.sprite.onerror = () => { char.loaded = false; };
-    char.sprite.src = char.src;
-  });
+  CHARACTERS.cat.sprite.onload = () => { CHARACTERS.cat.loaded = true; };
+  CHARACTERS.cat.sprite.src = CHARACTERS.cat.src;
 
-  let activeCharacter = CHARACTERS.cat;
   let customAvatarImg = null;
 
   const player = {
@@ -140,14 +134,15 @@ window.addEventListener('DOMContentLoaded', () => {
     vy: 0,
     gravity: 0.35,
     jumpStrength: -7,
-    inventory: { shield: true, sword: false } // RESTORED DEFAULT SHIELD
+    inventory: { shield: true, sword: false }
   };
 
-  const knightPowerup = {
+  // Giant Spectral Aegis Shield Rampage
+  const giantShield = {
     active: false,
     pipesRemaining: 0,
-    xOffset: 45,
-    slashTimer: 0
+    radius: 70,
+    pulseTimer: 0
   };
 
   let pipes = [];
@@ -156,10 +151,15 @@ window.addEventListener('DOMContentLoaded', () => {
   let floatingTexts = [];
 
   // ==========================================
-  // 4. INPUT & EVENT LISTENERS
+  // 4. INPUT & CONTROLS
   // ==========================================
-  function jump() {
+  function handleTap() {
     initAudio();
+    if (!gameStarted) {
+      gameStarted = true;
+      resetGame();
+      return;
+    }
     if (gameOver) {
       resetGame();
       return;
@@ -169,11 +169,15 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   window.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' || e.code === 'ArrowUp') jump();
+    if (e.code === 'Space' || e.code === 'ArrowUp') handleTap();
   });
   canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    jump();
+    handleTap();
+  });
+  canvas.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    handleTap();
   });
 
   document.getElementById('audioToggle').addEventListener('click', (e) => {
@@ -195,15 +199,15 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==========================================
-  // 5. ITEM SPAWNING & COMBOS
+  // 5. RANDOMIZED ITEM SPAWNING & COMBOS
   // ==========================================
-  // Spawns items strictly within the open gap between pipes
   function spawnItem(pipeX, topHeight, gap) {
-    if (Math.random() < 0.4) {
-      // If player doesn't have sword, spawn sword more frequently
-      const type = !player.inventory.sword ? 'sword' : (Math.random() > 0.5 ? 'shield' : 'sword');
+    // 35% chance to spawn an item
+    if (Math.random() < 0.35) {
+      // Completely randomized 50/50 probability between sword and shield
+      const type = Math.random() < 0.5 ? 'shield' : 'sword';
       
-      // Calculate center of the open gap (with safety margin)
+      // Position safely in center of gap
       const safeY = topHeight + (gap / 2) - 10;
 
       items.push({
@@ -224,21 +228,20 @@ window.addEventListener('DOMContentLoaded', () => {
     spawnFloatingText(`Got ${type.toUpperCase()}!`, player.x, player.y - 15, "#00e676");
 
     if (player.inventory.shield && player.inventory.sword) {
-      triggerKnightCombo();
+      triggerGiantShieldCombo();
     }
   }
 
-  function triggerKnightCombo() {
+  function triggerGiantShieldCombo() {
     player.inventory.shield = false;
     player.inventory.sword = false;
 
-    knightPowerup.active = true;
-    knightPowerup.pipesRemaining = 6;
-    knightPowerup.slashTimer = 0;
+    giantShield.active = true;
+    giantShield.pipesRemaining = 6;
 
     score += 50;
     playSound('item');
-    spawnFloatingText("+50 KNIGHT RAMPAGE!", player.x, player.y - 30, "#ffd700");
+    spawnFloatingText("+50 GIANT AEGIS SHIELD!", player.x - 20, player.y - 30, "#ffd700");
   }
 
   function createPipeShatterParticles(x, y, width, height) {
@@ -281,12 +284,11 @@ window.addEventListener('DOMContentLoaded', () => {
       shattered: false
     });
 
-    // Pass topHeight & gap so items spawn safely in the middle of the gap
     spawnItem(pipeX, topHeight, gap);
   }
 
   function update() {
-    if (gameOver) return;
+    if (!gameStarted || gameOver) return;
     frameCount++;
 
     // Theme Switcher Progression
@@ -346,8 +348,9 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Pipes & Knight Slicing
-    const knightX = player.x + knightPowerup.xOffset;
+    // Giant Aegis & Pipe Collisions
+    const playerCenterX = player.x + player.width / 2;
+    const playerCenterY = player.y + player.height / 2;
 
     for (let i = pipes.length - 1; i >= 0; i--) {
       const pipe = pipes[i];
@@ -364,18 +367,18 @@ window.addEventListener('DOMContentLoaded', () => {
 
       if (pipe.shattered) continue;
 
-      if (knightPowerup.active) {
-        if (pipe.x <= knightX + 45 && pipe.x + pipe.width >= knightX) {
+      if (giantShield.active) {
+        // Check if pipe collides with Giant Shield Radius
+        if (pipe.x <= playerCenterX + giantShield.radius && pipe.x + pipe.width >= playerCenterX - giantShield.radius) {
           pipe.shattered = true;
-          knightPowerup.pipesRemaining--;
-          knightPowerup.slashTimer = 12;
+          giantShield.pipesRemaining--;
 
           playSound('shatter');
           createPipeShatterParticles(pipe.x, 0, pipe.width, pipe.topHeight);
           createPipeShatterParticles(pipe.x, pipe.bottomY, pipe.width, canvas.height - pipe.bottomY);
-          spawnFloatingText("SLASH!", pipe.x, player.y, "#ff5252");
+          spawnFloatingText("SHIELD SMASH!", pipe.x, player.y, "#00e676");
 
-          if (knightPowerup.pipesRemaining <= 0) knightPowerup.active = false;
+          if (giantShield.pipesRemaining <= 0) giantShield.active = false;
         }
       } else {
         const hitBox = (
@@ -393,11 +396,10 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Handle Shield Protection
   function handlePlayerHit() {
     if (player.inventory.shield) {
       player.inventory.shield = false;
-      player.vy = player.jumpStrength; // Bounce back safely
+      player.vy = player.jumpStrength;
       playSound('shatter');
       spawnFloatingText("SHIELD ABSORBED HIT!", player.x - 20, player.y - 20, "#00e676");
     } else {
@@ -431,7 +433,6 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.fillRect(pipe.x, 0, pipe.width, pipe.topHeight);
       ctx.fillRect(pipe.x, pipe.bottomY, pipe.width, canvas.height - pipe.bottomY);
 
-      // Pipe Rim Caps
       ctx.fillStyle = currentTheme.pipeAccent;
       ctx.fillRect(pipe.x - 3, pipe.topHeight - 15, pipe.width + 6, 15);
       ctx.fillRect(pipe.x - 3, pipe.bottomY, pipe.width + 6, 15);
@@ -454,8 +455,33 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.restore();
     });
 
-    // Player Rendering & Shield Aura
-    if (player.inventory.shield) {
+    // GIANT SPECTRAL SHIELD SUMMONING EFFECT
+    if (giantShield.active) {
+      giantShield.pulseTimer += 0.1;
+      const pulseRadius = giantShield.radius + Math.sin(giantShield.pulseTimer) * 5;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(player.x + player.width / 2, player.y + player.height / 2, pulseRadius, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0, 230, 118, 0.25)";
+      ctx.fill();
+      ctx.strokeStyle = "#00e676";
+      ctx.lineWidth = 4;
+      ctx.shadowColor = "#00e676";
+      ctx.shadowBlur = 15;
+      ctx.stroke();
+
+      // Outer Crest Ring
+      ctx.beginPath();
+      ctx.arc(player.x + player.width / 2, player.y + player.height / 2, pulseRadius + 8, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255, 215, 0, 0.6)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Standard Shield Aura
+    if (player.inventory.shield && !giantShield.active) {
       ctx.save();
       ctx.beginPath();
       ctx.arc(player.x + player.width / 2, player.y + player.height / 2, player.width / 2 + 6, 0, Math.PI * 2);
@@ -467,23 +493,19 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.restore();
     }
 
+    // Player Rendering
     if (customAvatarImg) {
       ctx.drawImage(customAvatarImg, player.x, player.y, player.width, player.height);
-    } else if (activeCharacter.loaded) {
-      ctx.drawImage(activeCharacter.sprite, player.x, player.y, player.width, player.height);
+    } else if (CHARACTERS.cat.loaded) {
+      ctx.drawImage(CHARACTERS.cat.sprite, player.x, player.y, player.width, player.height);
     } else {
-      ctx.fillStyle = activeCharacter.color;
+      ctx.fillStyle = CHARACTERS.cat.color;
       ctx.beginPath();
       ctx.arc(player.x + player.width / 2, player.y + player.height / 2, player.width / 2, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = "#ffffff";
       ctx.font = "14px sans-serif";
       ctx.fillText("🐱", player.x + 8, player.y + 23);
-    }
-
-    // Knight Companion Avatar
-    if (knightPowerup.active) {
-      drawKnight(player.x + knightPowerup.xOffset, player.y);
     }
 
     // Floating Text
@@ -502,7 +524,7 @@ window.addEventListener('DOMContentLoaded', () => {
     ctx.fillText(`Score: ${score}`, 15, 30);
 
     ctx.font = "12px sans-serif";
-    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
     ctx.fillText(`Best: ${highScore}`, 15, 48);
     ctx.fillText(`${currentTheme.name} Theme`, canvas.width - 100, 38);
     ctx.fillText(GAME_VERSION, canvas.width - 55, 20);
@@ -513,47 +535,50 @@ window.addEventListener('DOMContentLoaded', () => {
     ctx.font = "13px sans-serif";
     ctx.fillText(invStatus, 15, 70);
 
-    if (knightPowerup.active) {
-      ctx.fillStyle = "#ffd700";
+    if (giantShield.active) {
+      ctx.fillStyle = "#00e676";
       ctx.font = "bold 13px sans-serif";
-      ctx.fillText(`Knight Destruction: ${knightPowerup.pipesRemaining}`, 15, 90);
+      ctx.fillText(`Giant Aegis Pipes Left: ${giantShield.pipesRemaining}`, 15, 90);
     }
 
+    // RESTORED START SPLASH SCREEN
+    if (!gameStarted) {
+      ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 32px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("PIXEL JUMP", canvas.width / 2, canvas.height / 2 - 50);
+
+      ctx.fillStyle = "#ffd700";
+      ctx.font = "bold 18px sans-serif";
+      ctx.fillText(`HIGH SCORE: ${highScore}`, canvas.width / 2, canvas.height / 2 - 10);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "16px sans-serif";
+      ctx.fillText("Tap Screen or Press Space", canvas.width / 2, canvas.height / 2 + 35);
+      ctx.fillText("To Jump & Start Game", canvas.width / 2, canvas.height / 2 + 60);
+
+      ctx.textAlign = "left";
+    }
+
+    // GAME OVER OVERLAY
     if (gameOver) {
-      ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+      ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 28px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 15);
+      ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 20);
       ctx.font = "16px sans-serif";
-      ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2 + 15);
-      ctx.fillText("Tap or Press Space to Restart", canvas.width / 2, canvas.height / 2 + 45);
+      ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2 + 10);
+      ctx.fillStyle = "#ffd700";
+      ctx.fillText(`High Score: ${highScore}`, canvas.width / 2, canvas.height / 2 + 35);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText("Tap or Press Space to Restart", canvas.width / 2, canvas.height / 2 + 70);
       ctx.textAlign = "left";
     }
-  }
-
-  function drawKnight(x, y) {
-    ctx.save();
-    ctx.fillStyle = "#b0bec5";
-    ctx.fillRect(x, y - 5, 26, 36);
-    ctx.fillStyle = "#d32f2f";
-    ctx.fillRect(x - 8, y - 2, 8, 28);
-    ctx.fillStyle = "#263238";
-    ctx.fillRect(x + 14, y, 10, 6);
-
-    if (knightPowerup.slashTimer > 0) {
-      knightPowerup.slashTimer--;
-      ctx.beginPath();
-      ctx.arc(x + 30, y + 15, 35, -Math.PI / 3, Math.PI / 3, false);
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = "#e0f7fa";
-      ctx.stroke();
-    } else {
-      ctx.fillStyle = "#cfd8dc";
-      ctx.fillRect(x + 22, y - 15, 4, 30);
-    }
-    ctx.restore();
   }
 
   function endGame() {
@@ -564,10 +589,10 @@ window.addEventListener('DOMContentLoaded', () => {
   function resetGame() {
     player.y = 250;
     player.vy = 0;
-    player.inventory.shield = true; // RESTORE SHIELD ON RESET
+    player.inventory.shield = true;
     player.inventory.sword = false;
-    knightPowerup.active = false;
-    knightPowerup.pipesRemaining = 0;
+    giantShield.active = false;
+    giantShield.pipesRemaining = 0;
     score = 0;
     pipes = [];
     items = [];
