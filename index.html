@@ -3,54 +3,98 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PixelJump - Dynamic Cosmic Flight</title>
+  <title>PixelJump</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="game-container">
-    <canvas id="gameCanvas" width="400" height="600"></canvas>
 
-    <!-- Pre-game Customization Screen -->
+  <div id="game-container">
+    <!-- Start Screen Overlay -->
     <div id="start-screen" class="overlay">
-      <h1 class="title">PIXEL JUMP</h1>
-      
-      <div class="input-group">
-        <label for="player-initials">Enter Initials (1-3 Chars):</label>
-        <input type="text" id="player-initials" maxlength="3" placeholder="ACE" autocomplete="off">
+      <h1 class="title">PIXELJUMP</h1>
+
+      <!-- Power-Ups & Items Guide -->
+      <div class="info-panel">
+        <h3>Power-Ups & Hazards</h3>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="icon">🛡️</span>
+            <div>
+              <strong>Shield</strong>
+              <small>Absorbs 1 hit</small>
+            </div>
+          </div>
+          <div class="info-item">
+            <span class="icon">⏱️</span>
+            <div>
+              <strong>Slow-Mo</strong>
+              <small>50% game speed</small>
+            </div>
+          </div>
+          <div class="info-item">
+            <span class="icon">⚡</span>
+            <div>
+              <strong>2X Score</strong>
+              <small>Double points</small>
+            </div>
+          </div>
+          <div class="info-item">
+            <span class="icon">⭐</span>
+            <div>
+              <strong>Star</strong>
+              <small>+5 bonus pts</small>
+            </div>
+          </div>
+          <div class="info-item" style="grid-column: span 2;">
+            <span class="icon">☄️</span>
+            <div>
+              <strong>Moving Obstacles & Comets</strong>
+              <small>Spawn dynamically at higher scores!</small>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="input-group">
-        <label>Select Avatar:</label>
+        <label for="player-initials">Player Initials</label>
+        <input type="text" id="player-initials" maxlength="3" value="ACE">
+      </div>
+
+      <div class="input-group">
+        <label>Choose Avatar</label>
         <div class="avatar-selector">
           <button class="avatar-btn active" data-avatar="🚀">🚀</button>
-          <button class="avatar-btn" data-avatar="🛸">🛸</button>
           <button class="avatar-btn" data-avatar="👾">👾</button>
+          <button class="avatar-btn" data-avatar="🛸">🛸</button>
           <button class="avatar-btn" data-avatar="👻">👻</button>
         </div>
       </div>
 
       <div class="input-group">
-        <label for="custom-avatar-input">Or Upload Custom Avatar (Image):</label>
+        <label for="custom-avatar-input">Or Upload Custom Photo</label>
         <input type="file" id="custom-avatar-input" accept="image/*">
       </div>
 
-      <button id="start-btn" class="btn">START GAME</button>
+      <button id="start-btn" class="btn">LAUNCH GAME</button>
     </div>
 
-    <!-- Game Over Screen & Leaderboard -->
+    <!-- Game Over Screen Overlay -->
     <div id="game-over-screen" class="overlay hidden">
-      <h2>GAME OVER</h2>
-      <p id="final-score">Score: 0</p>
+      <h1 class="title" style="color: #ff1744;">GAME OVER</h1>
+      <p id="final-score">Final Score: 0</p>
 
       <div id="leaderboard-box">
-        <h3>Top High Scores</h3>
-        <ol id="leaderboard-list">
+        <h3>Top Astronauts</h3>
+        <ul id="leaderboard-list">
           <li class="loading">Loading scores...</li>
-        </ol>
+        </ul>
       </div>
 
       <button id="restart-btn" class="btn">PLAY AGAIN</button>
     </div>
+
+    <!-- Main Canvas -->
+    <canvas id="gameCanvas"></canvas>
   </div>
 
   <script src="game.js"></script>

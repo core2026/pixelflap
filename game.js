@@ -3,6 +3,15 @@ const WORKER_URL = "https://pixelflap-main.acekallas.workers.dev";
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
+const container = document.getElementById("game-container");
+
+// Dynamic Resolution Scaler for iPad / Desktop Container
+function resizeCanvas() {
+  canvas.width = container.clientWidth;
+  canvas.height = container.clientHeight;
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
 
 // UI Elements
 const startScreen = document.getElementById("start-screen");
@@ -14,7 +23,6 @@ const avatarBtns = document.querySelectorAll(".avatar-btn");
 const customAvatarInput = document.getElementById("custom-avatar-input");
 const leaderboardList = document.getElementById("leaderboard-list");
 const finalScoreEl = document.getElementById("final-score");
-const container = document.getElementById("game-container");
 
 // Cosmic Themes
 const themes = [
@@ -252,7 +260,7 @@ function startGame() {
 
   currentTheme = themes[Math.floor(Math.random() * themes.length)];
 
-  player.y = 250;
+  player.y = canvas.height / 2;
   player.velocity = 0;
   player.hasShield = false;
   activePowerUps.slowMoTimer = 0;
@@ -339,7 +347,6 @@ function update() {
       top: topHeight,
       bottom: canvas.height - topHeight - gap,
       passed: false,
-      // Oscillating pipe mechanic for score > 12
       isMoving: score >= 12 && Math.random() < 0.5,
       offset: 0,
       dir: 1
@@ -397,7 +404,7 @@ function update() {
     ) {
       if (player.hasShield) {
         player.hasShield = false;
-        p.x = -100; // Destroy obstacle
+        p.x = -100;
         playSound("shield_break");
         triggerHaptic([40, 30, 40]);
         addPopupText("SHIELD BROKEN!", player.x, player.y - 10, "#ff1744");
@@ -467,10 +474,10 @@ function update() {
         player.hasShield = true;
         addPopupText("SHIELD!", pu.x, pu.y, "#00e5ff");
       } else if (pu.type === "slowMo") {
-        activePowerUps.slowMoTimer = 300; // ~5 seconds
+        activePowerUps.slowMoTimer = 300;
         addPopupText("SLOW-MO!", pu.x, pu.y, "#d500f9");
       } else if (pu.type === "2x") {
-        activePowerUps.doubleScoreTimer = 360; // ~6 seconds
+        activePowerUps.doubleScoreTimer = 360;
         addPopupText("2X SCORE!", pu.x, pu.y, "#76ff03");
       }
     }

@@ -18,16 +18,17 @@ body {
   overflow: hidden;
 }
 
+/* Scalable Container for Mobile, iPad, and Desktop */
 #game-container {
   position: relative;
-  width: 100vw;
-  max-width: 420px;
-  height: 100vh;
-  max-height: 650px;
-  box-shadow: 0 0 30px rgba(0, 229, 255, 0.3);
-  border-radius: 12px;
+  width: 95vw;
+  max-width: 650px;
+  height: 92vh;
+  max-height: 850px;
+  box-shadow: 0 0 35px rgba(0, 229, 255, 0.35);
+  border-radius: 14px;
   overflow: hidden;
-  border: 2px solid rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.12);
   background: #000;
 }
 
@@ -45,15 +46,16 @@ canvas {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(10, 12, 26, 0.92);
+  background: rgba(10, 12, 26, 0.94);
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  padding: 24px;
+  padding: 20px 24px;
   z-index: 10;
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(8px);
   transition: opacity 0.3s ease;
+  overflow-y: auto;
 }
 
 .hidden {
@@ -67,20 +69,75 @@ canvas {
   background: linear-gradient(45deg, #00e5ff, #76ff03);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   text-shadow: 0 0 20px rgba(0, 229, 255, 0.4);
+}
+
+/* Power-Ups Info Guide on Splash Screen */
+.info-panel {
+  width: 100%;
+  background: rgba(20, 25, 43, 0.85);
+  border: 1px solid #2a334d;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 10px 0;
+}
+
+.info-panel h3 {
+  font-size: 0.85rem;
+  color: #00e5ff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.info-item span.icon {
+  font-size: 1.1rem;
+}
+
+.info-item div {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-item strong {
+  color: #fff;
+  font-size: 0.78rem;
+}
+
+.info-item small {
+  color: #a0aab8;
+  font-size: 0.7rem;
 }
 
 .input-group {
   width: 100%;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .input-group label {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: #a0aab8;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -88,12 +145,12 @@ canvas {
 
 input[type="text"] {
   width: 100%;
-  padding: 12px 14px;
+  padding: 10px 14px;
   border-radius: 6px;
   border: 1px solid #2a334d;
   background: #14192b;
   color: #fff;
-  font-size: 1.1rem;
+  font-size: 1rem;
   text-align: center;
   text-transform: uppercase;
   outline: none;
@@ -111,10 +168,10 @@ input[type="text"]:focus {
 }
 
 .avatar-btn {
-  font-size: 1.8rem;
+  font-size: 1.6rem;
   background: #14192b;
   border: 1px solid #2a334d;
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -123,18 +180,18 @@ input[type="text"]:focus {
 .avatar-btn.active, .avatar-btn:hover {
   border-color: #76ff03;
   background: #1f2740;
-  transform: scale(1.1);
+  transform: scale(1.08);
 }
 
 input[type="file"] {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: #a0aab8;
 }
 
 .btn {
   width: 100%;
   padding: 14px;
-  margin-top: 10px;
+  margin-top: 6px;
   border: none;
   border-radius: 6px;
   background: linear-gradient(45deg, #00e5ff, #00b0ff);
@@ -153,33 +210,33 @@ input[type="file"] {
 /* Leaderboard */
 #leaderboard-box {
   width: 100%;
-  max-height: 220px;
+  max-height: 200px;
   background: #14192b;
   border-radius: 8px;
-  padding: 12px;
-  margin: 15px 0;
+  padding: 10px;
+  margin: 10px 0;
   border: 1px solid #2a334d;
   overflow-y: auto;
 }
 
 #leaderboard-box h3 {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   text-transform: uppercase;
   color: #76ff03;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   text-align: center;
 }
 
 #leaderboard-list {
   list-style: none;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
 }
 
 #leaderboard-list li {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -194,7 +251,7 @@ input[type="file"] {
 }
 
 .time-stamp {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: #6c7a9c;
 }
 
