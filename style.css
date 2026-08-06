@@ -1,6 +1,6 @@
 /* =========================================================================
    PixelJump Stylesheet
-   Version: 2.0.0
+   Version: 2.1.0
 
    AI / DEVELOPER EDITING REQUIREMENT:
    Any assistant or developer who edits this file MUST bump the version
@@ -288,6 +288,36 @@ input[type="text"].invalid {
   background: var(--grass-green);
   color: #fff;
   border-color: #2fa956;
+  border-style: dashed;
+  position: relative;
+}
+
+.avatar-btn.upload-btn .plus-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--candy-pink);
+  color: #fff;
+  font-style: normal;
+  font-weight: 800;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+}
+
+.avatar-hint {
+  width: 100%;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  margin-top: -4px;
 }
 
 /* -------------------------------------------------------------------------

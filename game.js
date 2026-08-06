@@ -1,7 +1,17 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: 2.0.0
+ * Version: 2.1.0
+ *
+ * WHAT CHANGED IN v2.1.0
+ * - Shield pickup now destroys the pipe it collides with (small hop instead
+ *   of a big bounce) instead of just cushioning the hit.
+ * - Slow-mo pickup reskinned from a stopwatch to "Turtle Time" (🐢).
+ * - Initials are required before Start Game will work (shake + red outline
+ *   if left blank) — no more silent "---" fallback.
+ * - "Custom Avatar" upload is now a clearly-labeled camera button with a
+ *   hint caption, instead of an ambiguous folder icon.
+ * - CONFIG.API_BASE_URL now points at the real deployed Worker.
  *
  * WHAT CHANGED IN v2.0.0
  * - Canvas now fills the screen edge-to-edge and resizes live (no more fixed
@@ -26,17 +36,17 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.0.0";
+  const GAME_VERSION = "v2.1.0";
 
   // ===========================================================================
   // 0. CONFIG
   // ===========================================================================
   const CONFIG = {
     // TODO(dev): replace with your deployed Worker URL, e.g.
-    // "https://game-leaderboard-api.acekallas.workers.dev"
+    // "https://pixeljump-leaderboard.<your-subdomain>.workers.dev"
     // This must point at the index.js Worker that talks to your D1 database
     // named "game-leaderboard". Leave as-is to run in local/offline mode.
-    API_BASE_URL: "https://REPLACE-WITH-YOUR-WORKER-URL.workers.dev",
+    API_BASE_URL: "https://game-leaderboard-api.acekallas.workers.dev",
     // Reference design resolution. All gameplay physics/sizes are scaled
     // relative to this so the game *feels* the same on any screen size.
     BASE_W: 450,
@@ -335,8 +345,9 @@ window.addEventListener('DOMContentLoaded', () => {
     const uploadBtn = document.createElement('button');
     uploadBtn.type = 'button';
     uploadBtn.className = 'avatar-btn upload-btn';
-    uploadBtn.setAttribute('aria-label', 'Upload your own photo');
-    uploadBtn.innerHTML = `<span>📁</span>`;
+    uploadBtn.setAttribute('aria-label', 'Use your own photo instead');
+    uploadBtn.setAttribute('title', 'Use your own photo!');
+    uploadBtn.innerHTML = `<span>📷<i class="plus-badge">+</i></span>`;
     uploadBtn.addEventListener('click', () => avatarFileInput.click());
     avatarSelector.appendChild(uploadBtn);
 
@@ -373,7 +384,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // ===========================================================================
   const GUIDE_SECTIONS = [
     { icon: '🛡️', title: 'Aura Shield', body: 'Blocks 1 hit. Grab a 2nd to stack a double barrier!' },
-    { icon: '⏱️', title: 'Chrono Pulse', body: 'Slows the pipes by half for 8 seconds.' },
+    { icon: '🐢', title: 'Turtle Time', body: 'Everything slows way down for 8 seconds!' },
     { icon: '💎', title: 'Gem Multiplier', body: 'Doubles your points for a while!' },
     { icon: '⚔️', title: 'Sword Pickup', body: 'Combine with an active Shield for a surprise!' },
     { icon: '🛡️+⚔️', title: "Knight's Rampage", body: 'Smashes 6 pipes in a row for +50 points!' },
@@ -408,13 +419,22 @@ window.addEventListener('DOMContentLoaded', () => {
   initialsInput.addEventListener('input', () => {
     playerInitials = initialsInput.value.toUpperCase().replace(/[^A-Z]/g, '').substring(0, 3);
     initialsInput.value = playerInitials;
+    if (playerInitials.length > 0) initialsInput.classList.remove('invalid');
   });
   initialsInput.addEventListener('blur', () => {
     if (playerInitials.trim().length > 0) localStorage.setItem('pixeljump_initials', playerInitials);
   });
 
   startGameBtn.addEventListener('click', () => {
-    if (playerInitials.trim().length > 0) localStorage.setItem('pixeljump_initials', playerInitials);
+    // Require at least one letter before play can begin — no silent "---" fallback.
+    if (playerInitials.trim().length === 0) {
+      initialsInput.classList.add('invalid');
+      initialsInput.focus();
+      splashScreen.classList.add('shake');
+      setTimeout(() => splashScreen.classList.remove('shake'), 300);
+      return;
+    }
+    localStorage.setItem('pixeljump_initials', playerInitials);
     initAudio();
     gameStarted = true;
     showScreen('game');
@@ -508,7 +528,7 @@ window.addEventListener('DOMContentLoaded', () => {
       spawnFloatingText("GOT SWORD!", player.x, player.y - 15, "#facc15");
     } else if (type === 'slow') {
       slowMoTimer = 480;
-      spawnFloatingText("⏱️ CHRONO PULSE!", player.x, player.y - 15, "#38bdf8");
+      spawnFloatingText("🐢 TURTLE TIME!", player.x, player.y - 15, "#22c55e");
     } else if (type === 'gem') {
       scoreMultiplierTimer = 360;
       spawnFloatingText("💎 2X POINTS!", player.x, player.y - 15, "#c084fc");
@@ -631,20 +651,33 @@ window.addEventListener('DOMContentLoaded', () => {
       } else {
         const hitBox = (player.x + player.width > pipe.x && player.x < pipe.x + pipe.width &&
           (player.y < pipe.topHeight || player.y + player.height > pipe.bottomY));
-        if (hitBox) handlePlayerHit();
+        if (hitBox) handlePlayerHit(pipe);
       }
 
       if (pipe.x + pipe.width < 0) pipes.splice(i, 1);
     }
   }
 
-  function handlePlayerHit() {
+  // pipe is optional — omitted when the hit was the ceiling/floor rather than
+  // an actual pipe (in that case the shield just cushions the bump).
+  function handlePlayerHit(pipe = null) {
     if (player.shieldCount > 0) {
       player.shieldCount--;
-      player.vy = player.jumpStrength;
       playSound('shatter');
       const remText = player.shieldCount > 0 ? "1 SHIELD REMAINING!" : "SHIELD BROKEN!";
-      spawnFloatingText(remText, player.x - 20, player.y - 20, "#10b981");
+
+      if (pipe) {
+        // Shield smashes straight through the pipe instead of just bouncing off it.
+        pipe.shattered = true;
+        createPipeShatterParticles(pipe.x, 0, pipe.width, pipe.topHeight);
+        createPipeShatterParticles(pipe.x, pipe.bottomY, pipe.width, VH - pipe.bottomY);
+        spawnFloatingText("🛡️ SHIELD SMASH!", pipe.x, player.y - 20, "#10b981");
+        spawnFloatingText(remText, player.x - 20, player.y + 10, "#10b981");
+        player.vy = player.jumpStrength * 0.5; // small hop, the pipe is already gone
+      } else {
+        player.vy = player.jumpStrength;
+        spawnFloatingText(remText, player.x - 20, player.y - 20, "#10b981");
+      }
     } else {
       endGame();
     }
@@ -698,7 +731,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     items.forEach(item => {
       ctx.font = `${24 * SCALE}px sans-serif`;
-      let icon = item.type === 'sword' ? '⚔️' : item.type === 'slow' ? '⏱️' : item.type === 'gem' ? '💎' : '🛡️';
+      let icon = item.type === 'sword' ? '⚔️' : item.type === 'slow' ? '🐢' : item.type === 'gem' ? '💎' : '🛡️';
       ctx.fillText(icon, item.x, item.y);
     });
 
@@ -775,8 +808,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
     if (slowMoTimer > 0) {
       hudY += 20 * SCALE;
-      ctx.fillStyle = "#38bdf8";
-      ctx.fillText(`⏱️ Chrono Pulse: ${Math.ceil(slowMoTimer / 60)}s`, pad, hudY);
+      ctx.fillStyle = "#22c55e";
+      ctx.fillText(`🐢 Turtle Time: ${Math.ceil(slowMoTimer / 60)}s`, pad, hudY);
     }
     if (scoreMultiplierTimer > 0) {
       hudY += 20 * SCALE;
