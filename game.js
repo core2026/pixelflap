@@ -34,9 +34,134 @@ const CHARACTERS = {
 
       ctx.restore();
     }
+  },
+
+  pac: {
+    radius: 16,
+    draw(ctx, x, y, radius, rotation) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+
+      // mouth angle animates a bit based on rotation so it "chomps" as it flaps
+      const mouthOpen = 0.25 + Math.abs(Math.sin(Date.now() / 100)) * 0.25;
+
+      ctx.fillStyle = '#f6d33c';
+      ctx.strokeStyle = '#1e2327';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, mouthOpen * Math.PI, (2 - mouthOpen) * Math.PI);
+      ctx.lineTo(0, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.restore();
+    }
+  },
+
+  cat: {
+    radius: 16,
+    draw(ctx, x, y, radius, rotation) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+
+      // ears
+      ctx.fillStyle = '#e8955c';
+      ctx.strokeStyle = '#1e2327';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(-radius * 0.6, -radius * 0.6);
+      ctx.lineTo(-radius * 0.1, -radius * 1.15);
+      ctx.lineTo(-radius * 0.05, -radius * 0.4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(radius * 0.6, -radius * 0.6);
+      ctx.lineTo(radius * 0.1, -radius * 1.15);
+      ctx.lineTo(radius * 0.05, -radius * 0.4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // head
+      ctx.fillStyle = '#f4a862';
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // eyes
+      ctx.fillStyle = '#1e2327';
+      ctx.beginPath();
+      ctx.arc(-radius * 0.3, -radius * 0.1, radius * 0.1, 0, Math.PI * 2);
+      ctx.arc(radius * 0.3, -radius * 0.1, radius * 0.1, 0, Math.PI * 2);
+      ctx.fill();
+
+      // nose + whiskers
+      ctx.strokeStyle = '#1e2327';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-radius * 0.5, radius * 0.15);
+      ctx.lineTo(-radius * 0.05, radius * 0.25);
+      ctx.moveTo(radius * 0.5, radius * 0.15);
+      ctx.lineTo(radius * 0.05, radius * 0.25);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+  },
+
+  dog: {
+    radius: 16,
+    draw(ctx, x, y, radius, rotation) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+
+      // floppy ear
+      ctx.fillStyle = '#8a5a34';
+      ctx.strokeStyle = '#1e2327';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.ellipse(-radius * 0.75, radius * 0.1, radius * 0.35, radius * 0.55, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // head
+      ctx.fillStyle = '#c98a4b';
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // snout patch
+      ctx.fillStyle = '#f0d9b5';
+      ctx.beginPath();
+      ctx.ellipse(radius * 0.35, radius * 0.3, radius * 0.45, radius * 0.32, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // nose
+      ctx.fillStyle = '#1e2327';
+      ctx.beginPath();
+      ctx.arc(radius * 0.65, radius * 0.28, radius * 0.12, 0, Math.PI * 2);
+      ctx.fill();
+
+      // eye
+      ctx.beginPath();
+      ctx.arc(radius * 0.1, -radius * 0.15, radius * 0.11, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
   }
 };
-const ACTIVE_CHARACTER = 'blob';
+
+const DEFAULT_CHARACTER = 'pac';
+let ACTIVE_CHARACTER = localStorage.getItem('pixelflap-character') || DEFAULT_CHARACTER;
 
 // ============================================================
 // GAME SETUP
@@ -62,7 +187,9 @@ const bestScoreEl = document.getElementById('best-score');
 const startBtn = document.getElementById('start-btn');
 const retryBtn = document.getElementById('retry-btn');
 
-const character = CHARACTERS[ACTIVE_CHARACTER];
+function getCharacter() {
+  return CHARACTERS[ACTIVE_CHARACTER];
+}
 
 let state = 'idle'; // idle | playing | dead
 let player, pipes, frameCount, score, bestScore;
@@ -72,7 +199,7 @@ function resetGame() {
     x: GAME_WIDTH * 0.3,
     y: GAME_HEIGHT / 2,
     velocity: 0,
-    radius: character.radius
+    radius: getCharacter().radius
   };
   pipes = [];
   frameCount = 0;
@@ -196,7 +323,7 @@ function draw() {
 
   // player
   const rotation = Math.max(-0.5, Math.min(0.9, player.velocity * 0.06));
-  character.draw(ctx, player.x, player.y, player.radius, rotation);
+  getCharacter().draw(ctx, player.x, player.y, player.radius, rotation);
 }
 
 function loop() {
@@ -204,6 +331,46 @@ function loop() {
   draw();
   requestAnimationFrame(loop);
 }
+
+// ============================================================
+// CHARACTER SELECTION
+// ============================================================
+const charOptions = document.querySelectorAll('.char-option');
+
+function renderCharacterPreviews() {
+  charOptions.forEach(option => {
+    const key = option.dataset.character;
+    const previewCanvas = option.querySelector('.char-preview');
+    const pctx = previewCanvas.getContext('2d');
+    pctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+    CHARACTERS[key].draw(
+      pctx,
+      previewCanvas.width / 2,
+      previewCanvas.height / 2,
+      18,
+      0
+    );
+  });
+}
+
+function markSelectedOption() {
+  charOptions.forEach(option => {
+    option.classList.toggle('selected', option.dataset.character === ACTIVE_CHARACTER);
+  });
+}
+
+charOptions.forEach(option => {
+  option.addEventListener('click', () => {
+    ACTIVE_CHARACTER = option.dataset.character;
+    localStorage.setItem('pixelflap-character', ACTIVE_CHARACTER);
+    markSelectedOption();
+  });
+});
+
+// re-render previews continuously so the pac muncher animates on the select screen
+setInterval(() => {
+  if (state === 'idle') renderCharacterPreviews();
+}, 100);
 
 // ============================================================
 // INPUT
@@ -230,5 +397,7 @@ retryBtn.addEventListener('click', startGame);
 // ============================================================
 loadBestScore();
 resetGame();
+renderCharacterPreviews();
+markSelectedOption();
 draw();
 loop();
