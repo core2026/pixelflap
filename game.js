@@ -6,7 +6,6 @@ const WORKER_URL = "https://game-leaderboard-api.acekallas.workers.dev";
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-// Responsive Scaling
 function resizeCanvas() {
   canvas.width = canvas.parentElement.clientWidth;
   canvas.height = canvas.parentElement.clientHeight;
@@ -19,7 +18,7 @@ let gameState = "MENU"; // MENU, PLAYING, GAMEOVER
 let score = 0;
 let bestScore = localStorage.getItem("pixeljump_best") || 0;
 let selectedChar = "cat";
-let customImage = null; // Custom uploaded avatar Image object
+let customImage = null;
 
 // Physics Engine Vars
 let birdY = canvas.height / 2;
@@ -27,14 +26,24 @@ let velocity = 0;
 const gravity = 0.38;
 const jump = -7.5;
 
-// Dynamic Sizes (Adjusts based on custom image vs standard avatars)
+// Dynamic Sizes
 let currentBirdRadius = 22;
 let currentPipeGap = 160;
 let currentPipeWidth = 50;
 
-// Crystal Obstacles
+// Obstacles & Particles
 let pipes = [];
+let particles = [];
+let stars = [];
 let frameCount = 0;
+
+// Color Themes for Score Progression
+const SKY_THEMES = [
+  { top: "#1e1b4b", bottom: "#311042" }, // Dusk
+  { top: "#0f172a", bottom: "#1e3a8a" }, // Cosmic Navy
+  { top: "#311042", bottom: "#701a75" }, // Synthwave Magenta
+  { top: "#064e3b", bottom: "#022c22" }  // Deep Emerald
+];
 
 // UI Elements
 const charSelectOverlay = document.getElementById("character-select");
@@ -51,16 +60,22 @@ playerNameInput.addEventListener("input", (e) => {
   e.target.value = e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase();
 });
 
-// Update game mechanics & bird size depending on avatar selection
+// Setup Background Starfield
+for (let i = 0; i < 40; i++) {
+  stars.push({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    size: Math.random() * 2 + 0.5,
+    speed: Math.random() * 0.5 + 0.2
+  });
+}
+
 function updateGameplayDimensions() {
   if (selectedChar === "custom") {
-    // Make player larger for mobile & custom visibility
-    currentBirdRadius = 32;
-    // Enlarge gap & adjust pipe width to maintain fair gameplay
-    currentPipeGap = 200;
+    currentBirdRadius = 30;
+    currentPipeGap = 195;
     currentPipeWidth = 45;
   } else {
-    // Default dimensions for standard avatars
     currentBirdRadius = 22;
     currentPipeGap = 160;
     currentPipeWidth = 50;
@@ -68,7 +83,7 @@ function updateGameplayDimensions() {
 }
 
 // ==========================================
-// CUSTOM IMAGE UPLOADER
+// CUSTOM IMAGE UPLOADER & CHAR PICKER
 // ==========================================
 imageUpload.addEventListener("change", (e) => {
   const file = e.target.files[0];
@@ -79,7 +94,6 @@ imageUpload.addEventListener("change", (e) => {
       img.onload = function () {
         customImage = img;
         selectedChar = "custom";
-        // Remove active state from preset buttons
         document.querySelectorAll(".char-btn").forEach(b => b.classList.remove("active"));
         uploadStatus.innerText = "✓ Avatar Loaded!";
         updateGameplayDimensions();
@@ -90,13 +104,12 @@ imageUpload.addEventListener("change", (e) => {
   }
 });
 
-// Character Picker Listener
 document.querySelectorAll(".char-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".char-btn").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     selectedChar = btn.dataset.char;
-    customImage = null; // Reset custom image if user chooses default
+    customImage = null;
     uploadStatus.innerText = "";
     updateGameplayDimensions();
   });
@@ -138,12 +151,13 @@ function resetGameVars() {
   birdY = canvas.height / 2;
   velocity = 0;
   pipes = [];
+  particles = [];
   score = 0;
   frameCount = 0;
   updateGameplayDimensions();
 }
 
-// User Interaction / Jump
+// Controls
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space") handleAction();
 });
@@ -160,14 +174,25 @@ function handleAction() {
 }
 
 // ==========================================
-// RENDER HELPERS
+// RENDER HELPERS & PARTICLES
 // ==========================================
+function spawnParticle(x, y) {
+  particles.push({
+    x: x - currentBirdRadius / 2,
+    y: y + (Math.random() * 10 - 5),
+    vx: -Math.random() * 2 - 1,
+    vy: Math.random() * 2 - 1,
+    size: Math.random() * 4 + 2,
+    alpha: 1.0,
+    color: selectedChar === "star" ? "#facc15" : selectedChar === "cat" ? "#f97316" : "#a855f7"
+  });
+}
+
 function drawPlayer(x, y) {
   ctx.save();
   ctx.translate(x, y);
 
   if (selectedChar === "custom" && customImage) {
-    // Render Custom Uploaded Image inside a circle
     ctx.beginPath();
     ctx.arc(0, 0, currentBirdRadius, 0, Math.PI * 2);
     ctx.closePath();
@@ -180,27 +205,23 @@ function drawPlayer(x, y) {
       currentBirdRadius * 2
     );
   } else if (selectedChar === "cat") {
-    // High-Clarity Cat Design
     ctx.fillStyle = "#f97316";
     ctx.beginPath();
     ctx.arc(0, 0, currentBirdRadius, 0, Math.PI * 2);
     ctx.fill();
 
-    // Outer Ears
     ctx.fillStyle = "#f97316";
     ctx.beginPath();
     ctx.moveTo(-16, -10); ctx.lineTo(-22, -26); ctx.lineTo(-6, -18); ctx.fill();
     ctx.beginPath();
     ctx.moveTo(16, -10); ctx.lineTo(22, -26); ctx.lineTo(6, -18); ctx.fill();
 
-    // Inner Pink Ears
     ctx.fillStyle = "#f472b6";
     ctx.beginPath();
     ctx.moveTo(-14, -12); ctx.lineTo(-19, -22); ctx.lineTo(-8, -17); ctx.fill();
     ctx.beginPath();
     ctx.moveTo(14, -12); ctx.lineTo(19, -22); ctx.lineTo(8, -17); ctx.fill();
 
-    // Large Eyes
     ctx.fillStyle = "#ffffff";
     ctx.beginPath(); ctx.arc(-7, -2, 6, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(7, -2, 6, 0, Math.PI * 2); ctx.fill();
@@ -209,13 +230,11 @@ function drawPlayer(x, y) {
     ctx.beginPath(); ctx.arc(-6, -2, 3, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(8, -2, 3, 0, Math.PI * 2); ctx.fill();
 
-    // Pink Nose Triangle
     ctx.fillStyle = "#f472b6";
     ctx.beginPath();
     ctx.moveTo(0, 3); ctx.lineTo(-3, 7); ctx.lineTo(3, 7); ctx.fill();
 
   } else if (selectedChar === "star") {
-    // Single Crisp Star Rendering
     ctx.fillStyle = "#facc15";
     ctx.beginPath();
     for (let i = 0; i < 5; i++) {
@@ -232,14 +251,11 @@ function drawPlayer(x, y) {
     ctx.fill();
 
   } else {
-    // Dog Avatar
     ctx.fillStyle = "#eab308";
     ctx.beginPath(); ctx.arc(0, 0, currentBirdRadius, 0, Math.PI * 2); ctx.fill();
-    // Floppy Ears
     ctx.fillStyle = "#ca8a04";
     ctx.beginPath(); ctx.ellipse(-18, 0, 6, 14, Math.PI / 6, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.ellipse(18, 0, 6, 14, -Math.PI / 6, 0, Math.PI * 2); ctx.fill();
-    // Eyes & Nose
     ctx.fillStyle = "#000000";
     ctx.beginPath(); ctx.arc(-6, -3, 3, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(6, -3, 3, 0, Math.PI * 2); ctx.fill();
@@ -250,20 +266,40 @@ function drawPlayer(x, y) {
 }
 
 // ==========================================
-// MAIN GAME LOOP & OBSTACLES
+// MAIN LOOP & PHYSICS
 // ==========================================
 function update() {
+  // Update background starfield (Runs continuously for visual flair)
+  stars.forEach((s) => {
+    s.x -= s.speed;
+    if (s.x < 0) s.x = canvas.width;
+  });
+
   if (gameState !== "PLAYING") return;
 
   velocity += gravity;
   birdY += velocity;
+
+  // Trail Particles
+  if (frameCount % 2 === 0) {
+    spawnParticle(80, birdY);
+  }
+
+  // Update Trail Particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    let p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.alpha -= 0.03;
+    if (p.alpha <= 0) particles.splice(i, 1);
+  }
 
   // Floor / Ceiling Collision
   if (birdY + currentBirdRadius >= canvas.height || birdY - currentBirdRadius <= 0) {
     endGame();
   }
 
-  // Spawn Crystal Pipes
+  // Spawn Crystal Pillars
   frameCount++;
   if (frameCount % 90 === 0) {
     const topHeight = Math.random() * (canvas.height - currentPipeGap - 120) + 40;
@@ -274,13 +310,11 @@ function update() {
   for (let i = pipes.length - 1; i >= 0; i--) {
     pipes[i].x -= 2.5;
 
-    // Check Score
     if (!pipes[i].passed && pipes[i].x < 80) {
       pipes[i].passed = true;
       score++;
     }
 
-    // Collision Check
     const p = pipes[i];
     if (
       80 + currentBirdRadius > p.x &&
@@ -290,7 +324,6 @@ function update() {
       endGame();
     }
 
-    // Remove Off-screen Pipes
     if (pipes[i].x + currentPipeWidth < 0) {
       pipes.splice(i, 1);
     }
@@ -298,25 +331,53 @@ function update() {
 }
 
 function draw() {
-  // Dusk Sky Background
+  // Sky Theme changes every 10 points
+  const themeIndex = Math.floor(score / 10) % SKY_THEMES.length;
+  const currentTheme = SKY_THEMES[themeIndex];
+
   const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  skyGrad.addColorStop(0, "#1e1b4b");
-  skyGrad.addColorStop(1, "#311042");
+  skyGrad.addColorStop(0, currentTheme.top);
+  skyGrad.addColorStop(1, currentTheme.bottom);
   ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Draw Crystal Spires (Obstacles)
+  // Parallax Starfield
+  ctx.fillStyle = "#ffffff";
+  stars.forEach((s) => {
+    ctx.globalAlpha = 0.6;
+    ctx.fillRect(s.x, s.y, s.size, s.size);
+  });
+  ctx.globalAlpha = 1.0;
+
+  // Particle Trail
+  particles.forEach((p) => {
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // Pulsing Crystal Pillars
   pipes.forEach((p) => {
+    const pulse = Math.sin(frameCount * 0.05) * 0.2 + 0.8;
     const crystalGrad = ctx.createLinearGradient(p.x, 0, p.x + currentPipeWidth, 0);
     crystalGrad.addColorStop(0, "#a855f7");
     crystalGrad.addColorStop(0.5, "#3b82f6");
     crystalGrad.addColorStop(1, "#1e40af");
 
     ctx.fillStyle = crystalGrad;
+    ctx.shadowBlur = 12 * pulse;
+    ctx.shadowColor = "#a855f7";
+
     // Top Crystal
     ctx.fillRect(p.x, 0, currentPipeWidth, p.top);
     // Bottom Crystal
     ctx.fillRect(p.x, p.top + currentPipeGap, currentPipeWidth, canvas.height - (p.top + currentPipeGap));
+    
+    ctx.shadowBlur = 0; // Reset blur
   });
 
   // Draw Player Avatar
@@ -324,11 +385,14 @@ function draw() {
     drawPlayer(80, birdY);
   }
 
-  // Draw Live Score Counter
+  // Score
   if (gameState === "PLAYING") {
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 28px sans-serif";
+    ctx.font = "bold 32px sans-serif";
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
     ctx.fillText(score, canvas.width / 2 - 10, 50);
+    ctx.shadowBlur = 0;
   }
 }
 
@@ -354,7 +418,6 @@ function endGame() {
 
   gameOverOverlay.classList.remove("hidden");
 
-  // Submit Score & Refresh High Scores list
   const initials = (playerNameInput.value || "AAA").toUpperCase();
   submitScore(initials, score);
 }
@@ -364,7 +427,6 @@ async function submitScore(name, scoreVal) {
   listEl.innerHTML = "<li>Updating leaderboard...</li>";
 
   try {
-    // 1. Post current score
     if (scoreVal > 0) {
       await fetch(`${WORKER_URL}/api/leaderboard`, {
         method: "POST",
@@ -373,19 +435,32 @@ async function submitScore(name, scoreVal) {
       });
     }
 
-    // 2. Retrieve Top 10 from Cloudflare D1
+    // Fetch Top 15 High Scores
     const res = await fetch(`${WORKER_URL}/api/leaderboard`);
     const scores = await res.json();
 
     listEl.innerHTML = "";
-    if (scores.length === 0) {
+    if (!scores || scores.length === 0) {
       listEl.innerHTML = "<li>No scores yet. Be the first!</li>";
       return;
     }
 
     scores.forEach((entry, idx) => {
       const li = document.createElement("li");
-      li.innerHTML = `<span>${idx + 1}. ${htmlEscape(entry.player_name)}</span> <strong>${entry.score}</strong>`;
+      
+      let formattedTime = "";
+      if (entry.created_at) {
+        const d = new Date(entry.created_at);
+        formattedTime = `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+      }
+
+      li.innerHTML = `
+        <span class="rank-name">${idx + 1}. <strong>${htmlEscape(entry.player_name)}</strong></span>
+        <span class="score-date">
+          <small class="time-stamp">${formattedTime}</small>
+          <strong class="score-val">${entry.score}</strong>
+        </span>
+      `;
       listEl.appendChild(li);
     });
   } catch (err) {

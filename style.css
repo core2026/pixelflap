@@ -103,7 +103,7 @@ h2 {
   background: rgba(139, 92, 246, 0.2);
 }
 
-/* Character Preview Graphics Fix */
+/* Character Previews */
 .char-preview {
   width: 36px;
   height: 36px;
@@ -114,7 +114,6 @@ h2 {
   justify-content: center;
 }
 
-/* Cat Preview Graphic */
 .cat-icon { 
   background: #f97316; 
 }
@@ -131,7 +130,6 @@ h2 {
 .cat-icon::before { left: 2px; transform: rotate(-15deg); }
 .cat-icon::after { right: 2px; transform: rotate(15deg); }
 
-/* Dog Preview Graphic */
 .dog-icon { 
   background: #eab308; 
 }
@@ -147,7 +145,6 @@ h2 {
 .dog-icon::before { left: -3px; transform: rotate(15deg); }
 .dog-icon::after { right: -3px; transform: rotate(-15deg); }
 
-/* Star Preview Graphic */
 .star-icon {
   background: #facc15;
   clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
@@ -231,14 +228,15 @@ input[type="text"] {
   color: #e5e7eb;
 }
 
+/* Leaderboard Display Updates */
 .leaderboard-box {
   width: 100%;
-  max-width: 260px;
+  max-width: 280px;
   background: rgba(0, 0, 0, 0.3);
   border-radius: 8px;
   padding: 12px;
   margin: 12px 0;
-  max-height: 180px;
+  max-height: 200px;
   overflow-y: auto;
 }
 
@@ -257,6 +255,23 @@ input[type="text"] {
 #leaderboardList li {
   display: flex;
   justify-content: space-between;
-  padding: 4px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  align-items: center;
+  padding: 6px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.85rem;
+}
+
+.time-stamp {
+  color: #9ca3af;
+  font-size: 0.7rem;
+  margin-right: 8px;
+}
+
+.score-date {
+  display: flex;
+  align-items: center;
+}
+
+.score-val {
+  color: #facc15;
 }
