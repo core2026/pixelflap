@@ -1,7 +1,7 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: 2.1.0
+ * Version: v2.1.01
  *
  * WHAT CHANGED IN v2.1.0
  * - Shield pickup now destroys the pipe it collides with (small hop instead
@@ -13,7 +13,7 @@
  *   hint caption, instead of an ambiguous folder icon.
  * - CONFIG.API_BASE_URL now points at the real deployed Worker.
  *
- * WHAT CHANGED IN v2.0.0
+ * WHAT CHANGED IN v2.1.01
  * - Canvas now fills the screen edge-to-edge and resizes live (no more fixed
  *   450x750 box) so it scales cleanly to phones, tablets, and desktops.
  * - Splash / Game Over / How-to-Play screens moved OUT of hand-drawn canvas
