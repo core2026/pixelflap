@@ -1,7 +1,7 @@
 /**
  * =============================================================================
  * PixelJump Leaderboard API (Cloudflare Worker + D1)
- * Version: 2.0.0
+ * Version: v2.1.01
  *
  * Talks to a D1 database (binding name: DB, database: "game-leaderboard")
  * with a table shaped like:
