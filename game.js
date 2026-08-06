@@ -344,8 +344,10 @@ function update() {
   if (isSlowMo) activePowerUps.slowMoTimer--;
   if (activePowerUps.doubleScoreTimer > 0) activePowerUps.doubleScoreTimer--;
 
+  // Dynamic Base Speed: Starts at 2.0, scales up to 3.2 as score increases
+  const baseSpeed = Math.min(2.0 + score * 0.04, 3.2);
   const speedMult = isSlowMo ? 0.55 : 1.0;
-  const gameSpeed = 2.5 * speedMult;
+  const gameSpeed = baseSpeed * speedMult;
 
   player.velocity += player.gravity * (isSlowMo ? 0.75 : 1.0);
   player.y += player.velocity;
@@ -373,7 +375,8 @@ function update() {
 
   const spawnRate = isSlowMo ? 120 : 90;
   if (frames % spawnRate === 0) {
-    const gap = 145;
+    // Dynamic Gap: Starts wide (190px) for beginners and shrinks to 135px as score increases
+    const gap = Math.max(190 - score * 2, 135);
     const minTop = 40;
     const maxTop = canvas.height - gap - 60;
     const topHeight = Math.floor(Math.random() * (maxTop - minTop + 1)) + minTop;
@@ -383,7 +386,7 @@ function update() {
       top: topHeight,
       bottom: canvas.height - topHeight - gap,
       passed: false,
-      isMoving: score >= 12 && Math.random() < 0.5,
+      isMoving: score >= 15 && Math.random() < 0.4,
       offset: 0,
       dir: 1
     });
@@ -398,7 +401,7 @@ function update() {
     }
   }
 
-  if (score >= 8 && frames % 260 === 0 && Math.random() < 0.6) {
+  if (score >= 12 && frames % 260 === 0 && Math.random() < 0.5) {
     comets.push({
       x: canvas.width + 30,
       y: Math.random() * (canvas.height - 150) + 50,
