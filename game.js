@@ -17,7 +17,7 @@ window.addEventListener("resize", resizeCanvas);
 // Game State
 let gameState = "MENU"; // MENU, PLAYING, GAMEOVER
 let score = 0;
-let bestScore = localStorage.getItem("crystal_best") || 0;
+let bestScore = localStorage.getItem("pixeljump_best") || 0;
 let selectedChar = "cat";
 let customImage = null; // Custom uploaded avatar Image object
 
@@ -26,12 +26,14 @@ let birdY = canvas.height / 2;
 let velocity = 0;
 const gravity = 0.38;
 const jump = -7.5;
-const birdRadius = 22; // Enlarged for high-DPI clarity
+
+// Dynamic Sizes (Adjusts based on custom image vs standard avatars)
+let currentBirdRadius = 22;
+let currentPipeGap = 160;
+let currentPipeWidth = 50;
 
 // Crystal Obstacles
 let pipes = [];
-const pipeWidth = 50;
-const pipeGap = 160;
 let frameCount = 0;
 
 // UI Elements
@@ -43,6 +45,27 @@ const changeCharBtn = document.getElementById("changeCharBtn");
 const imageUpload = document.getElementById("imageUpload");
 const uploadStatus = document.getElementById("uploadStatus");
 const playerNameInput = document.getElementById("playerName");
+
+// Restrict initials input to max 3 uppercase letters
+playerNameInput.addEventListener("input", (e) => {
+  e.target.value = e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase();
+});
+
+// Update game mechanics & bird size depending on avatar selection
+function updateGameplayDimensions() {
+  if (selectedChar === "custom") {
+    // Make player larger for mobile & custom visibility
+    currentBirdRadius = 32;
+    // Enlarge gap & adjust pipe width to maintain fair gameplay
+    currentPipeGap = 200;
+    currentPipeWidth = 45;
+  } else {
+    // Default dimensions for standard avatars
+    currentBirdRadius = 22;
+    currentPipeGap = 160;
+    currentPipeWidth = 50;
+  }
+}
 
 // ==========================================
 // CUSTOM IMAGE UPLOADER
@@ -59,6 +82,7 @@ imageUpload.addEventListener("change", (e) => {
         // Remove active state from preset buttons
         document.querySelectorAll(".char-btn").forEach(b => b.classList.remove("active"));
         uploadStatus.innerText = "✓ Avatar Loaded!";
+        updateGameplayDimensions();
       };
       img.src = event.target.result;
     };
@@ -74,6 +98,7 @@ document.querySelectorAll(".char-btn").forEach((btn) => {
     selectedChar = btn.dataset.char;
     customImage = null; // Reset custom image if user chooses default
     uploadStatus.innerText = "";
+    updateGameplayDimensions();
   });
 });
 
@@ -88,7 +113,6 @@ retryBtn.addEventListener("click", () => {
   gameState = "PLAYING";
 });
 
-// Fix: Change Character Button Action
 changeCharBtn.addEventListener("click", () => {
   gameOverOverlay.classList.add("hidden");
   charSelectOverlay.classList.remove("hidden");
@@ -97,6 +121,13 @@ changeCharBtn.addEventListener("click", () => {
 });
 
 function startGame() {
+  const initials = playerNameInput.value.trim();
+  if (initials.length !== 3) {
+    alert("Please enter exactly 3 letters for your initials.");
+    playerNameInput.focus();
+    return;
+  }
+
   charSelectOverlay.classList.add("hidden");
   gameOverOverlay.classList.add("hidden");
   resetGameVars();
@@ -109,6 +140,7 @@ function resetGameVars() {
   pipes = [];
   score = 0;
   frameCount = 0;
+  updateGameplayDimensions();
 }
 
 // User Interaction / Jump
@@ -128,7 +160,7 @@ function handleAction() {
 }
 
 // ==========================================
-// RENDER HELPERS (Clear Cat, Single Star, Custom Avatar)
+// RENDER HELPERS
 // ==========================================
 function drawPlayer(x, y) {
   ctx.save();
@@ -137,16 +169,21 @@ function drawPlayer(x, y) {
   if (selectedChar === "custom" && customImage) {
     // Render Custom Uploaded Image inside a circle
     ctx.beginPath();
-    ctx.arc(0, 0, birdRadius, 0, Math.PI * 2);
+    ctx.arc(0, 0, currentBirdRadius, 0, Math.PI * 2);
     ctx.closePath();
     ctx.clip();
-    ctx.drawImage(customImage, -birdRadius, -birdRadius, birdRadius * 2, birdRadius * 2);
+    ctx.drawImage(
+      customImage, 
+      -currentBirdRadius, 
+      -currentBirdRadius, 
+      currentBirdRadius * 2, 
+      currentBirdRadius * 2
+    );
   } else if (selectedChar === "cat") {
     // High-Clarity Cat Design
-    // Head Base
     ctx.fillStyle = "#f97316";
     ctx.beginPath();
-    ctx.arc(0, 0, birdRadius, 0, Math.PI * 2);
+    ctx.arc(0, 0, currentBirdRadius, 0, Math.PI * 2);
     ctx.fill();
 
     // Outer Ears
@@ -178,17 +215,17 @@ function drawPlayer(x, y) {
     ctx.moveTo(0, 3); ctx.lineTo(-3, 7); ctx.lineTo(3, 7); ctx.fill();
 
   } else if (selectedChar === "star") {
-    // Single Crisp Star Rendering (Fixed double-render glitch)
+    // Single Crisp Star Rendering
     ctx.fillStyle = "#facc15";
     ctx.beginPath();
     for (let i = 0; i < 5; i++) {
       ctx.lineTo(
-        Math.cos(((18 + i * 72) * Math.PI) / 180) * birdRadius,
-        -Math.sin(((18 + i * 72) * Math.PI) / 180) * birdRadius
+        Math.cos(((18 + i * 72) * Math.PI) / 180) * currentBirdRadius,
+        -Math.sin(((18 + i * 72) * Math.PI) / 180) * currentBirdRadius
       );
       ctx.lineTo(
-        Math.cos(((54 + i * 72) * Math.PI) / 180) * (birdRadius / 2),
-        -Math.sin(((54 + i * 72) * Math.PI) / 180) * (birdRadius / 2)
+        Math.cos(((54 + i * 72) * Math.PI) / 180) * (currentBirdRadius / 2),
+        -Math.sin(((54 + i * 72) * Math.PI) / 180) * (currentBirdRadius / 2)
       );
     }
     ctx.closePath();
@@ -197,7 +234,7 @@ function drawPlayer(x, y) {
   } else {
     // Dog Avatar
     ctx.fillStyle = "#eab308";
-    ctx.beginPath(); ctx.arc(0, 0, birdRadius, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, currentBirdRadius, 0, Math.PI * 2); ctx.fill();
     // Floppy Ears
     ctx.fillStyle = "#ca8a04";
     ctx.beginPath(); ctx.ellipse(-18, 0, 6, 14, Math.PI / 6, 0, Math.PI * 2); ctx.fill();
@@ -222,14 +259,14 @@ function update() {
   birdY += velocity;
 
   // Floor / Ceiling Collision
-  if (birdY + birdRadius >= canvas.height || birdY - birdRadius <= 0) {
+  if (birdY + currentBirdRadius >= canvas.height || birdY - currentBirdRadius <= 0) {
     endGame();
   }
 
   // Spawn Crystal Pipes
   frameCount++;
   if (frameCount % 90 === 0) {
-    const topHeight = Math.random() * (canvas.height - pipeGap - 120) + 40;
+    const topHeight = Math.random() * (canvas.height - currentPipeGap - 120) + 40;
     pipes.push({ x: canvas.width, top: topHeight, passed: false });
   }
 
@@ -246,15 +283,15 @@ function update() {
     // Collision Check
     const p = pipes[i];
     if (
-      80 + birdRadius > p.x &&
-      80 - birdRadius < p.x + pipeWidth &&
-      (birdY - birdRadius < p.top || birdY + birdRadius > p.top + pipeGap)
+      80 + currentBirdRadius > p.x &&
+      80 - currentBirdRadius < p.x + currentPipeWidth &&
+      (birdY - currentBirdRadius < p.top || birdY + currentBirdRadius > p.top + currentPipeGap)
     ) {
       endGame();
     }
 
     // Remove Off-screen Pipes
-    if (pipes[i].x + pipeWidth < 0) {
+    if (pipes[i].x + currentPipeWidth < 0) {
       pipes.splice(i, 1);
     }
   }
@@ -270,16 +307,16 @@ function draw() {
 
   // Draw Crystal Spires (Obstacles)
   pipes.forEach((p) => {
-    const crystalGrad = ctx.createLinearGradient(p.x, 0, p.x + pipeWidth, 0);
+    const crystalGrad = ctx.createLinearGradient(p.x, 0, p.x + currentPipeWidth, 0);
     crystalGrad.addColorStop(0, "#a855f7");
     crystalGrad.addColorStop(0.5, "#3b82f6");
     crystalGrad.addColorStop(1, "#1e40af");
 
     ctx.fillStyle = crystalGrad;
     // Top Crystal
-    ctx.fillRect(p.x, 0, pipeWidth, p.top);
+    ctx.fillRect(p.x, 0, currentPipeWidth, p.top);
     // Bottom Crystal
-    ctx.fillRect(p.x, p.top + pipeGap, pipeWidth, canvas.height - (p.top + pipeGap));
+    ctx.fillRect(p.x, p.top + currentPipeGap, currentPipeWidth, canvas.height - (p.top + currentPipeGap));
   });
 
   // Draw Player Avatar
@@ -311,14 +348,15 @@ function endGame() {
 
   if (score > bestScore) {
     bestScore = score;
-    localStorage.setItem("crystal_best", bestScore);
+    localStorage.setItem("pixeljump_best", bestScore);
   }
   document.getElementById("bestScore").innerText = bestScore;
 
   gameOverOverlay.classList.remove("hidden");
 
   // Submit Score & Refresh High Scores list
-  submitScore(playerNameInput.value || "Player1", score);
+  const initials = (playerNameInput.value || "AAA").toUpperCase();
+  submitScore(initials, score);
 }
 
 async function submitScore(name, scoreVal) {

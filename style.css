@@ -50,7 +50,7 @@ canvas {
   padding: 24px;
   text-align: center;
   z-index: 10;
-  overflow-y: auto; /* Fixes clipped leaderboard on smaller mobile screens */
+  overflow-y: auto;
 }
 
 .hidden {
@@ -62,6 +62,7 @@ h1 {
   color: #8b5cf6;
   text-shadow: 0 0 12px rgba(139, 92, 246, 0.5);
   margin-bottom: 4px;
+  letter-spacing: 1px;
 }
 
 h2 {
@@ -102,15 +103,56 @@ h2 {
   background: rgba(139, 92, 246, 0.2);
 }
 
+/* Character Preview Graphics Fix */
 .char-preview {
   width: 36px;
   height: 36px;
   border-radius: 50%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.cat-icon { background: #f97316; }
-.dog-icon { background: #eab308; }
-.star-icon { background: #facc15; }
+/* Cat Preview Graphic */
+.cat-icon { 
+  background: #f97316; 
+}
+.cat-icon::before, .cat-icon::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 8px solid #f97316;
+}
+.cat-icon::before { left: 2px; transform: rotate(-15deg); }
+.cat-icon::after { right: 2px; transform: rotate(15deg); }
+
+/* Dog Preview Graphic */
+.dog-icon { 
+  background: #eab308; 
+}
+.dog-icon::before, .dog-icon::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  width: 8px;
+  height: 16px;
+  background: #ca8a04;
+  border-radius: 4px;
+}
+.dog-icon::before { left: -3px; transform: rotate(15deg); }
+.dog-icon::after { right: -3px; transform: rotate(-15deg); }
+
+/* Star Preview Graphic */
+.star-icon {
+  background: #facc15;
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  border-radius: 0;
+}
 
 /* Custom Upload Styling */
 .upload-section {
@@ -141,18 +183,21 @@ h2 {
 .name-input-group {
   margin-bottom: 16px;
   width: 100%;
-  max-width: 240px;
+  max-width: 160px;
 }
 
 input[type="text"] {
   width: 100%;
   padding: 10px 14px;
   border-radius: 8px;
-  border: 1px solid #374151;
+  border: 2px solid #8b5cf6;
   background: #111827;
   color: #fff;
   text-align: center;
-  font-size: 1rem;
+  font-size: 1.25rem;
+  font-weight: bold;
+  letter-spacing: 4px;
+  text-transform: uppercase;
 }
 
 .button-group {
