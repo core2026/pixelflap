@@ -1,10 +1,10 @@
 /**
  * PixelJump Engine
- * Version: 1.8.0 (Interactive Character Carousel, Validated Initials & Styled High Score Leaderboard)
+ * Version: 1.10.0 (All Items Restored: Slow-Mo, Gems, Shield, Sword Combo, Styled Arrows & Guide)
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v1.8.0";
+  const GAME_VERSION = "v1.10.0";
   const canvas = document.getElementById('gameCanvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -24,8 +24,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
   let gameStarted = false;
   let gameOver = false;
+  let showInfoModal = false;
   let frameCount = 0;
   let audioMuted = false;
+
+  // Active Powerup Timers & States
+  let slowMoTimer = 0;
+  let scoreMultiplierTimer = 0;
 
   const THEMES = {
     day: { name: 'Day', background: "#70c5ce", pipeColor: "#2e7d32", pipeAccent: "#1b5e20", cloudColor: "rgba(255, 255, 255, 0.7)" },
@@ -130,7 +135,6 @@ window.addEventListener('DOMContentLoaded', () => {
   let particles = [];
   let floatingTexts = [];
 
-  // Strict 1-3 Letter Initials Prompt
   function promptForInitials() {
     let input = prompt("Enter your Initials (1 to 3 letters):", playerInitials);
     if (input !== null) {
@@ -146,7 +150,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // 4. INPUT & SPLASH CONTROLS
+  // 4. INPUT & CLICK HANDLING
   // ==========================================
   function handleCanvasClick(e) {
     const rect = canvas.getBoundingClientRect();
@@ -161,32 +165,41 @@ window.addEventListener('DOMContentLoaded', () => {
       clickY = (e.touches[0].clientY - rect.top) * scaleY;
     }
 
+    if (showInfoModal) {
+      showInfoModal = false;
+      return;
+    }
+
     if (!gameStarted) {
+      // Info Button Click Zone (y: 10-40, right side)
+      if (clickX >= 290 && clickX <= 380 && clickY >= 10 && clickY <= 40) {
+        showInfoModal = true;
+        return;
+      }
+
       // Initials Box Click Zone (y: 60-100)
-      if (clickX >= 60 && clickX <= 340 && clickY >= 60 && clickY <= 100) {
+      if (clickX >= 50 && clickX <= 350 && clickY >= 60 && clickY <= 100) {
         promptForInitials();
         return;
       }
 
       // Avatar Previous Arrow Click Zone (y: 110-150, left arrow)
-      if (clickX >= 60 && clickX <= 110 && clickY >= 110 && clickY <= 150) {
+      if (clickX >= 50 && clickX <= 95 && clickY >= 110 && clickY <= 150) {
         selectedAvatarIndex = (selectedAvatarIndex - 1 + AVATARS.length) % AVATARS.length;
         customAvatarImg = null;
         return;
       }
 
       // Avatar Next Arrow Click Zone (y: 110-150, right arrow)
-      if (clickX >= 290 && clickX <= 340 && clickY >= 110 && clickY <= 150) {
+      if (clickX >= 305 && clickX <= 350 && clickY >= 110 && clickY <= 150) {
         selectedAvatarIndex = (selectedAvatarIndex + 1) % AVATARS.length;
         customAvatarImg = null;
         return;
       }
 
-      // Start Button Click Zone (y: 500-550)
-      if (clickX >= 80 && clickX <= 320 && clickY >= 500 && clickY <= 550) {
-        if (!playerInitials) {
-          promptForInitials();
-        }
+      // Start Button Click Zone (y: 500-552)
+      if (clickX >= 70 && clickX <= 330 && clickY >= 500 && clickY <= 552) {
+        if (!playerInitials) promptForInitials();
         initAudio();
         gameStarted = true;
         resetGame();
@@ -208,6 +221,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space' || e.code === 'ArrowUp') {
+      if (showInfoModal) {
+        showInfoModal = false;
+        return;
+      }
       if (!gameStarted) {
         if (!playerInitials) promptForInitials();
         initAudio();
@@ -251,11 +268,18 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==========================================
-  // 5. ITEM SPAWNING & LEADERBOARD LOGIC
+  // 5. GAME & LEADERBOARD LOGIC
   // ==========================================
   function spawnItem(pipeX, topHeight, gap) {
-    if (Math.random() < 0.35) {
-      const type = Math.random() < 0.5 ? 'shield' : 'sword';
+    if (Math.random() < 0.45) {
+      const rand = Math.random();
+      let type = 'shield';
+
+      if (rand < 0.3) type = 'shield';
+      else if (rand < 0.55) type = 'sword';
+      else if (rand < 0.8) type = 'slow';
+      else type = 'gem';
+
       const safeY = topHeight + (gap / 2) - 10;
 
       items.push({
@@ -269,11 +293,21 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function collectItem(type) {
-    if (type === 'shield') player.inventory.shield = true;
-    if (type === 'sword') player.inventory.sword = true;
-
     playSound('item');
-    spawnFloatingText(`Got ${type.toUpperCase()}!`, player.x, player.y - 15, "#00e676");
+
+    if (type === 'shield') {
+      player.inventory.shield = true;
+      spawnFloatingText("GOT SHIELD!", player.x, player.y - 15, "#00e676");
+    } else if (type === 'sword') {
+      player.inventory.sword = true;
+      spawnFloatingText("GOT SWORD!", player.x, player.y - 15, "#ffea00");
+    } else if (type === 'slow') {
+      slowMoTimer = 480; // ~8 seconds at 60 FPS
+      spawnFloatingText("⏳ SLOW TIME!", player.x, player.y - 15, "#00e5ff");
+    } else if (type === 'gem') {
+      scoreMultiplierTimer = 360; // ~6 seconds at 60 FPS
+      spawnFloatingText("💎 2X POINTS!", player.x, player.y - 15, "#e040fb");
+    }
 
     if (player.inventory.shield && player.inventory.sword) {
       triggerGiantShieldCombo();
@@ -289,7 +323,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     score += 50;
     playSound('item');
-    spawnFloatingText("+50 KNIGHT'S AEGIS SHIELD!", player.x - 30, player.y - 30, "#ffd700");
+    spawnFloatingText("+50 KNIGHT'S AEGIS RAMPAGE!", player.x - 30, player.y - 30, "#ffd700");
   }
 
   function saveHighScore(newScore) {
@@ -343,8 +377,13 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function update() {
-    if (!gameStarted || gameOver) return;
+    if (!gameStarted || gameOver || showInfoModal) return;
     frameCount++;
+
+    if (slowMoTimer > 0) slowMoTimer--;
+    if (scoreMultiplierTimer > 0) scoreMultiplierTimer--;
+
+    const currentSpeed = (slowMoTimer > 0) ? 1.0 : 2.0;
 
     if (score >= 30) currentTheme = THEMES.retro;
     else if (score >= 20) currentTheme = THEMES.night;
@@ -352,7 +391,7 @@ window.addEventListener('DOMContentLoaded', () => {
     else currentTheme = THEMES.day;
 
     clouds.forEach(c => {
-      c.x -= c.speed;
+      c.x -= (c.speed * (currentSpeed / 2));
       if (c.x + c.size * 2 < 0) c.x = canvas.width + 50;
     });
 
@@ -363,7 +402,8 @@ window.addEventListener('DOMContentLoaded', () => {
       handlePlayerHit();
     }
 
-    if (frameCount % 110 === 0) spawnPipe();
+    const pipeSpawnInterval = (slowMoTimer > 0) ? 220 : 110;
+    if (frameCount % pipeSpawnInterval === 0) spawnPipe();
 
     // Floating text
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
@@ -387,7 +427,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // Items
     for (let i = items.length - 1; i >= 0; i--) {
       const item = items[i];
-      item.x -= 2;
+      item.x -= currentSpeed;
 
       if (!item.collected && 
           player.x < item.x + item.size &&
@@ -402,16 +442,20 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Pipes & Knight Shield Collisions
+    // Pipes & Collisions
     const playerCenterX = player.x + player.width / 2;
 
     for (let i = pipes.length - 1; i >= 0; i--) {
       const pipe = pipes[i];
-      pipe.x -= 2;
+      pipe.x -= currentSpeed;
 
       if (!pipe.passed && pipe.x + pipe.width < player.x) {
         pipe.passed = true;
-        score++;
+        const addScore = (scoreMultiplierTimer > 0) ? 2 : 1;
+        score += addScore;
+        if (scoreMultiplierTimer > 0) {
+          spawnFloatingText("+2 PTS 💎", player.x, player.y - 20, "#e040fb");
+        }
       }
 
       if (pipe.shattered) continue;
@@ -456,7 +500,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // 7. RENDERING PIPELINE & STYLED UI
+  // 7. DRAWING UI & VISUAL COMPONENTS
   // ==========================================
   function drawKnightKiteShield(x, y) {
     ctx.save();
@@ -501,47 +545,39 @@ window.addEventListener('DOMContentLoaded', () => {
     ctx.restore();
   }
 
-  // Render Top 10 High Score Table Card
   function drawLeaderboardCard(startY, title) {
     const width = 340;
     const height = 310;
     const x = (canvas.width - width) / 2;
 
-    // Dark Glass Panel
     ctx.fillStyle = "rgba(20, 20, 25, 0.9)";
     ctx.fillRect(x, startY, width, height);
     ctx.strokeStyle = "rgba(255, 215, 0, 0.5)";
     ctx.lineWidth = 2;
     ctx.strokeRect(x, startY, width, height);
 
-    // Title Header
     ctx.fillStyle = "#ffd700";
     ctx.font = "bold 16px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(title, canvas.width / 2, startY + 28);
 
-    // Columns
-    const displayScores = highScores.slice(0, 10); // Display Top 10 clearly
+    const displayScores = highScores.slice(0, 10);
     let rowY = startY + 58;
 
     displayScores.forEach((hs, idx) => {
       ctx.font = "bold 14px sans-serif";
 
-      // Rank & Colors
-      if (idx === 0) ctx.fillStyle = "#ffd700"; // 🥇 Gold
-      else if (idx === 1) ctx.fillStyle = "#e0e0e0"; // 🥈 Silver
-      else if (idx === 2) ctx.fillStyle = "#cd7f32"; // 🥉 Bronze
+      if (idx === 0) ctx.fillStyle = "#ffd700";
+      else if (idx === 1) ctx.fillStyle = "#e0e0e0";
+      else if (idx === 2) ctx.fillStyle = "#cd7f32";
       else ctx.fillStyle = "#b0bec5";
 
-      // Rank Text
       ctx.textAlign = "left";
       ctx.fillText(`#${idx + 1}`, x + 25, rowY);
 
-      // Player Name
       ctx.fillStyle = (hs.name === playerInitials) ? "#00e676" : "#ffffff";
       ctx.fillText(hs.name, x + 85, rowY);
 
-      // Score Text
       ctx.textAlign = "right";
       ctx.fillText(`${hs.score} pts`, x + width - 25, rowY);
 
@@ -549,8 +585,76 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Information & Upgrade Guide Overlay Modal
+  function drawInfoModal() {
+    ctx.fillStyle = "rgba(0, 0, 0, 0.92)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const width = 350;
+    const height = 480;
+    const x = (canvas.width - width) / 2;
+    const y = 60;
+
+    ctx.fillStyle = "rgba(25, 30, 40, 0.95)";
+    ctx.fillRect(x, y, width, height);
+    ctx.strokeStyle = "#00e676";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, width, height);
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ffd700";
+    ctx.font = "bold 19px sans-serif";
+    ctx.fillText("⚔️ GAME UPGRADES & GUIDE 🛡️", canvas.width / 2, y + 35);
+
+    ctx.textAlign = "left";
+    let textY = y + 68;
+
+    const sections = [
+      { icon: "🛡️", title: "Aura Shield (Default)", body: "Absorbs 1 collision hit from a pipe or ground. Grants a second chance!" },
+      { icon: "⏳", title: "Slow-Mo Hourglass", body: "Slows pipe game speed by 50% for 8 seconds for easier navigation." },
+      { icon: "💎", title: "Gem Multiplier", body: "Doubles all points earned for passing pipes while active!" },
+      { icon: "⚔️", title: "Sword Pickup", body: "Collect alongside your Shield to activate Knight Rampage." },
+      { icon: "🛡️+⚔️", title: "Knight's Aegis Rampage", body: "Summons the Knight Kite Shield to smash 6 consecutive pipes for +50 bonus pts!" }
+    ];
+
+    sections.forEach(sec => {
+      ctx.fillStyle = "#00e676";
+      ctx.font = "bold 13px sans-serif";
+      ctx.fillText(`${sec.icon} ${sec.title}`, x + 18, textY);
+      textY += 16;
+
+      ctx.fillStyle = "#d1d5db";
+      ctx.font = "11px sans-serif";
+      
+      const words = sec.body.split(' ');
+      let line = '';
+      for (let w of words) {
+        if (ctx.measureText(line + w).width > width - 36) {
+          ctx.fillText(line, x + 18, textY);
+          textY += 14;
+          line = w + ' ';
+        } else {
+          line += w + ' ';
+        }
+      }
+      ctx.fillText(line, x + 18, textY);
+      textY += 22;
+    });
+
+    // Close Button
+    ctx.fillStyle = "#2e7d32";
+    ctx.fillRect(x + 75, y + height - 48, 200, 36);
+    ctx.strokeStyle = "#ffffff";
+    ctx.strokeRect(x + 75, y + height - 48, 200, 36);
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 14px sans-serif";
+    ctx.fillText("CLOSE GUIDE", canvas.width / 2, y + height - 25);
+  }
+
   function draw() {
-    // Background Theme
+    // Background
     ctx.fillStyle = currentTheme.background;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -564,7 +668,7 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.fill();
     });
 
-    // Theme Pipes
+    // Pipes
     pipes.forEach(pipe => {
       if (pipe.shattered) return;
 
@@ -580,7 +684,11 @@ window.addEventListener('DOMContentLoaded', () => {
     // Items
     items.forEach(item => {
       ctx.font = "22px sans-serif";
-      ctx.fillText(item.type === 'shield' ? '🛡️' : '⚔️', item.x, item.y);
+      let icon = '🛡️';
+      if (item.type === 'sword') icon = '⚔️';
+      else if (item.type === 'slow') icon = '⏳';
+      else if (item.type === 'gem') icon = '💎';
+      ctx.fillText(icon, item.x, item.y);
     });
 
     // Particles
@@ -594,7 +702,7 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.restore();
     });
 
-    // Player Avatar Rendering
+    // Player Avatar
     const currentAvatar = AVATARS[selectedAvatarIndex];
     if (customAvatarImg) {
       ctx.drawImage(customAvatarImg, player.x, player.y, player.width, player.height);
@@ -608,7 +716,7 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.fillText(currentAvatar.emoji, player.x + 7, player.y + 24);
     }
 
-    // Standard Shield Aura
+    // Shield Aura
     if (player.inventory.shield && !giantShield.active) {
       ctx.save();
       ctx.beginPath();
@@ -621,7 +729,7 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.restore();
     }
 
-    // Knight Kite Shield Rampage
+    // Knight Shield
     if (giantShield.active) {
       drawKnightKiteShield(player.x + player.width + 22, player.y + player.height / 2);
     }
@@ -647,20 +755,34 @@ window.addEventListener('DOMContentLoaded', () => {
     ctx.fillText(`${currentTheme.name} Theme`, canvas.width - 100, 38);
     ctx.fillText(GAME_VERSION, canvas.width - 55, 20);
 
+    let hudY = 68;
     let invStatus = "Inventory: ";
     if (player.inventory.shield) invStatus += "🛡️ ";
     if (player.inventory.sword) invStatus += "⚔️ ";
     ctx.font = "13px sans-serif";
-    ctx.fillText(invStatus, 15, 70);
+    ctx.fillText(invStatus, 15, hudY);
+
+    if (slowMoTimer > 0) {
+      hudY += 18;
+      ctx.fillStyle = "#00e5ff";
+      ctx.fillText(`⏳ Slow Mo: ${Math.ceil(slowMoTimer / 60)}s`, 15, hudY);
+    }
+
+    if (scoreMultiplierTimer > 0) {
+      hudY += 18;
+      ctx.fillStyle = "#e040fb";
+      ctx.fillText(`💎 2x Points: ${Math.ceil(scoreMultiplierTimer / 60)}s`, 15, hudY);
+    }
 
     if (giantShield.active) {
+      hudY += 18;
       ctx.fillStyle = "#00e676";
       ctx.font = "bold 13px sans-serif";
-      ctx.fillText(`Knight Shield Hits Left: ${giantShield.pipesRemaining}`, 15, 90);
+      ctx.fillText(`Knight Shield Hits Left: ${giantShield.pipesRemaining}`, 15, hudY);
     }
 
     // ==========================================
-    // START SPLASH SCREEN WITH INTERACTIVE CONTROLS
+    // SPLASH SCREEN WITH STYLIZED ARROWS & INFO
     // ==========================================
     if (!gameStarted) {
       ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
@@ -671,48 +793,77 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.textAlign = "center";
       ctx.fillText("PIXEL JUMP", canvas.width / 2, 42);
 
+      // Info Guide Icon Button (Top Right)
+      ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+      ctx.fillRect(290, 10, 95, 30);
+      ctx.strokeStyle = "#00e676";
+      ctx.strokeRect(290, 10, 95, 30);
+      ctx.fillStyle = "#00e676";
+      ctx.font = "bold 12px sans-serif";
+      ctx.fillText("ℹ️ Guide", 337, 30);
+
       // Interactive Initials Box
       ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
-      ctx.fillRect(60, 60, 280, 40);
+      ctx.fillRect(50, 60, 300, 40);
       ctx.strokeStyle = "#ffd700";
       ctx.lineWidth = 1.5;
-      ctx.strokeRect(60, 60, 280, 40);
+      ctx.strokeRect(50, 60, 300, 40);
 
       ctx.fillStyle = "#ffd700";
       ctx.font = "bold 14px sans-serif";
       ctx.fillText(`INITIALS: [ ${playerInitials} ] (Tap to Change)`, canvas.width / 2, 85);
 
-      // Interactive Avatar Carousel Box
+      // Interactive Avatar Box with Stylized Glowing Arrows
       ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
-      ctx.fillRect(60, 110, 280, 40);
+      ctx.fillRect(50, 110, 300, 40);
       ctx.strokeStyle = "#00e676";
-      ctx.strokeRect(60, 110, 280, 40);
+      ctx.strokeRect(50, 110, 300, 40);
 
+      // Left Stylized Arrow Button Box
+      ctx.fillStyle = "#1b5e20";
+      ctx.fillRect(52, 112, 38, 36);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 18px sans-serif";
+      ctx.fillText("⟨", 71, 136);
+
+      // Right Stylized Arrow Button Box
+      ctx.fillStyle = "#1b5e20";
+      ctx.fillRect(310, 112, 38, 36);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 18px sans-serif";
+      ctx.fillText("⟩", 329, 136);
+
+      // Avatar Name & Emoji Center Label
       ctx.fillStyle = "#00e676";
-      ctx.font = "bold 15px sans-serif";
-      ctx.fillText("◀", 85, 135);
-      ctx.fillText(`AVATAR: ${customAvatarImg ? 'Custom Image 📁' : currentAvatar.emoji + ' ' + currentAvatar.name}`, canvas.width / 2, 135);
-      ctx.fillText("▶", 315, 135);
+      ctx.font = "bold 14px sans-serif";
+      ctx.fillText(`AVATAR: ${customAvatarImg ? 'Custom 📁' : currentAvatar.emoji + ' ' + currentAvatar.name}`, canvas.width / 2, 135);
 
-      // High Score Table
+      // Leaderboard
       drawLeaderboardCard(165, "🏆 HALL OF FAME 🏆");
 
-      // Start Button
+      // TAP TO START BUTTON (PERFECTLY CENTER ALIGNED)
+      const btnX = 70;
+      const btnY = 500;
+      const btnWidth = 260;
+      const btnHeight = 52;
+
       ctx.fillStyle = "#2e7d32";
-      ctx.fillRect(80, 495, 240, 52);
+      ctx.fillRect(btnX, btnY, btnWidth, btnHeight);
       ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = 2;
-      ctx.strokeRect(80, 495, 240, 52);
+      ctx.strokeRect(btnX, btnY, btnWidth, btnHeight);
 
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 18px sans-serif";
-      ctx.fillText("TAP TO START", canvas.width / 2, 528);
-
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("TAP TO START", btnX + (btnWidth / 2), btnY + (btnHeight / 2));
+      ctx.textBaseline = "alphabetic"; // Reset baseline
       ctx.textAlign = "left";
     }
 
     // ==========================================
-    // GAME OVER OVERLAY WITH CLEAR LEADERBOARD
+    // GAME OVER SCREEN
     // ==========================================
     if (gameOver) {
       ctx.fillStyle = "rgba(0, 0, 0, 0.88)";
@@ -727,7 +878,6 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.font = "15px sans-serif";
       ctx.fillText(`Final Score (${playerInitials}): ${score} pts`, canvas.width / 2, 72);
 
-      // Styled Leaderboard Card
       drawLeaderboardCard(90, "🏅 TOP SCORES LEADERBOARD 🏅");
 
       ctx.fillStyle = "#00e676";
@@ -735,6 +885,11 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.textAlign = "center";
       ctx.fillText("Tap Screen or Press Space to Play Again", canvas.width / 2, 530);
       ctx.textAlign = "left";
+    }
+
+    // Draw Info Modal Overlay over everything when open
+    if (showInfoModal) {
+      drawInfoModal();
     }
   }
 
@@ -753,6 +908,8 @@ window.addEventListener('DOMContentLoaded', () => {
     player.inventory.sword = false;
     giantShield.active = false;
     giantShield.pipesRemaining = 0;
+    slowMoTimer = 0;
+    scoreMultiplierTimer = 0;
     score = 0;
     pipes = [];
     items = [];
