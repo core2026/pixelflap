@@ -16,6 +16,9 @@ resizeCanvas();
 // UI Elements
 const startScreen = document.getElementById("start-screen");
 const gameOverScreen = document.getElementById("game-over-screen");
+const infoModal = document.getElementById("info-modal");
+const infoBtn = document.getElementById("info-btn");
+const closeInfoBtn = document.getElementById("close-info-btn");
 const startBtn = document.getElementById("start-btn");
 const restartBtn = document.getElementById("restart-btn");
 const initialsInput = document.getElementById("player-initials");
@@ -174,6 +177,15 @@ function stopBGM() {
   }
 }
 
+// Info Modal Controls
+infoBtn.addEventListener("click", () => {
+  infoModal.classList.remove("hidden");
+});
+
+closeInfoBtn.addEventListener("click", () => {
+  infoModal.classList.add("hidden");
+});
+
 // Initialize Controls & Avatars
 avatarBtns.forEach(btn => {
   btn.addEventListener("click", () => {
@@ -287,6 +299,7 @@ function startGame() {
   }
 
   startScreen.classList.add("hidden");
+  infoModal.classList.add("hidden");
   gameState = "PLAYING";
   startBGM();
 }

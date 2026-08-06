@@ -39,7 +39,7 @@ canvas {
   background: #000;
 }
 
-/* Overlays */
+/* Overlays & Modals */
 .overlay {
   position: absolute;
   top: 0;
@@ -49,9 +49,9 @@ canvas {
   background: rgba(10, 12, 26, 0.94);
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  padding: 20px 24px;
+  padding: 24px;
   z-index: 10;
   backdrop-filter: blur(8px);
   transition: opacity 0.3s ease;
@@ -69,48 +69,40 @@ canvas {
   background: linear-gradient(45deg, #00e5ff, #76ff03);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  margin-bottom: 10px;
+  margin-bottom: 20px;
   text-shadow: 0 0 20px rgba(0, 229, 255, 0.4);
 }
 
-/* Power-Ups Info Guide on Splash Screen */
-.info-panel {
-  width: 100%;
-  background: rgba(20, 25, 43, 0.85);
-  border: 1px solid #2a334d;
-  border-radius: 10px;
-  padding: 12px 14px;
-  margin: 10px 0;
-}
-
-.info-panel h3 {
-  font-size: 0.85rem;
+.modal-title {
+  font-size: 1.3rem;
+  font-weight: 700;
   color: #00e5ff;
-  text-transform: uppercase;
   letter-spacing: 1px;
-  margin-bottom: 8px;
+  margin-bottom: 20px;
   text-align: center;
 }
 
+/* Power-Ups Info Modal Items */
 .info-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  font-size: 0.8rem;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 24px;
 }
 
 .info-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  padding: 6px 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  gap: 10px;
+  background: rgba(20, 25, 43, 0.85);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #2a334d;
 }
 
 .info-item span.icon {
-  font-size: 1.1rem;
+  font-size: 1.3rem;
 }
 
 .info-item div {
@@ -120,20 +112,20 @@ canvas {
 
 .info-item strong {
   color: #fff;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
 }
 
 .info-item small {
   color: #a0aab8;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
 }
 
 .input-group {
   width: 100%;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .input-group label {
@@ -191,7 +183,7 @@ input[type="file"] {
 .btn {
   width: 100%;
   padding: 14px;
-  margin-top: 6px;
+  margin-top: 10px;
   border: none;
   border-radius: 6px;
   background: linear-gradient(45deg, #00e5ff, #00b0ff);
@@ -205,6 +197,17 @@ input[type="file"] {
 .btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(0, 229, 255, 0.4);
+}
+
+.secondary-btn {
+  background: rgba(20, 25, 43, 0.9);
+  color: #00e5ff;
+  border: 1px solid #2a334d;
+}
+
+.secondary-btn:hover {
+  border-color: #00e5ff;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.2);
 }
 
 /* Leaderboard */

@@ -13,48 +13,6 @@
     <div id="start-screen" class="overlay">
       <h1 class="title">PIXELJUMP</h1>
 
-      <!-- Power-Ups & Items Guide -->
-      <div class="info-panel">
-        <h3>Power-Ups & Hazards</h3>
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="icon">🛡️</span>
-            <div>
-              <strong>Shield</strong>
-              <small>Absorbs 1 hit</small>
-            </div>
-          </div>
-          <div class="info-item">
-            <span class="icon">⏱️</span>
-            <div>
-              <strong>Slow-Mo</strong>
-              <small>50% game speed</small>
-            </div>
-          </div>
-          <div class="info-item">
-            <span class="icon">⚡</span>
-            <div>
-              <strong>2X Score</strong>
-              <small>Double points</small>
-            </div>
-          </div>
-          <div class="info-item">
-            <span class="icon">⭐</span>
-            <div>
-              <strong>Star</strong>
-              <small>+5 bonus pts</small>
-            </div>
-          </div>
-          <div class="info-item" style="grid-column: span 2;">
-            <span class="icon">☄️</span>
-            <div>
-              <strong>Moving Obstacles & Comets</strong>
-              <small>Spawn dynamically at higher scores!</small>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div class="input-group">
         <label for="player-initials">Player Initials</label>
         <input type="text" id="player-initials" maxlength="3" value="ACE">
@@ -75,7 +33,53 @@
         <input type="file" id="custom-avatar-input" accept="image/*">
       </div>
 
+      <button id="info-btn" class="btn secondary-btn">📖 HOW TO PLAY / INFO</button>
       <button id="start-btn" class="btn">LAUNCH GAME</button>
+    </div>
+
+    <!-- Power-Ups & Hazards Info Modal -->
+    <div id="info-modal" class="overlay hidden">
+      <h2 class="modal-title">POWER-UPS & HAZARDS</h2>
+
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="icon">🛡️</span>
+          <div>
+            <strong>Shield</strong>
+            <small>Absorbs 1 hit</small>
+          </div>
+        </div>
+        <div class="info-item">
+          <span class="icon">⏱️</span>
+          <div>
+            <strong>Slow-Mo</strong>
+            <small>50% game speed</small>
+          </div>
+        </div>
+        <div class="info-item">
+          <span class="icon">⚡</span>
+          <div>
+            <strong>2X Score</strong>
+            <small>Double points</small>
+          </div>
+        </div>
+        <div class="info-item">
+          <span class="icon">⭐</span>
+          <div>
+            <strong>Star</strong>
+            <small>+5 bonus pts</small>
+          </div>
+        </div>
+        <div class="info-item" style="grid-column: span 2;">
+          <span class="icon">☄️</span>
+          <div>
+            <strong>Moving Obstacles & Comets</strong>
+            <small>Spawn dynamically at higher scores!</small>
+          </div>
+        </div>
+      </div>
+
+      <button id="close-info-btn" class="btn">CLOSE</button>
     </div>
 
     <!-- Game Over Screen Overlay -->
