@@ -1,53 +1,35 @@
 /**
  * PixelJump Engine
- * Version: 1.6.0 (Splash Screen, Giant Shield Rampage, Fixed Responsive Canvas, Randomized Items)
+ * Version: 1.7.0 (Initials Prompt, Avatar Selection, Top 15 Leaderboard & Knight Kite Shield Graphic)
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v1.6.0";
+  const GAME_VERSION = "v1.7.0";
   const canvas = document.getElementById('gameCanvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
 
   // ==========================================
-  // 1. STATE & THEMES
+  // 1. STATE & TOP 15 LEADERBOARD
   // ==========================================
   let score = 0;
-  let highScore = parseInt(localStorage.getItem('pixeljump_highscore')) || 0;
-  let gameStarted = false; // Restored Splash Screen State
+  let playerInitials = localStorage.getItem('pixeljump_initials') || "AAA";
+  let highScores = JSON.parse(localStorage.getItem('pixeljump_top15')) || [
+    { name: "ACE", score: 50 },
+    { name: "JMP", score: 35 },
+    { name: "CAT", score: 20 }
+  ];
+
+  let gameStarted = false;
   let gameOver = false;
   let frameCount = 0;
   let audioMuted = false;
 
   const THEMES = {
-    day: {
-      name: 'Day',
-      background: "#70c5ce",
-      pipeColor: "#2e7d32",
-      pipeAccent: "#1b5e20",
-      cloudColor: "rgba(255, 255, 255, 0.7)"
-    },
-    sunset: {
-      name: 'Sunset',
-      background: "#ff7043",
-      pipeColor: "#d84315",
-      pipeAccent: "#bf360c",
-      cloudColor: "rgba(255, 204, 188, 0.6)"
-    },
-    night: {
-      name: 'Night',
-      background: "#1a237e",
-      pipeColor: "#512da8",
-      pipeAccent: "#311b92",
-      cloudColor: "rgba(159, 168, 218, 0.4)"
-    },
-    retro: {
-      name: 'Cyberpunk',
-      background: "#212121",
-      pipeColor: "#00b0ff",
-      pipeAccent: "#0081cb",
-      cloudColor: "rgba(255, 0, 128, 0.3)"
-    }
+    day: { name: 'Day', background: "#70c5ce", pipeColor: "#2e7d32", pipeAccent: "#1b5e20", cloudColor: "rgba(255, 255, 255, 0.7)" },
+    sunset: { name: 'Sunset', background: "#ff7043", pipeColor: "#d84315", pipeAccent: "#bf360c", cloudColor: "rgba(255, 204, 188, 0.6)" },
+    night: { name: 'Night', background: "#1a237e", pipeColor: "#512da8", pipeAccent: "#311b92", cloudColor: "rgba(159, 168, 218, 0.4)" },
+    retro: { name: 'Cyberpunk', background: "#212121", pipeColor: "#00b0ff", pipeAccent: "#0081cb", cloudColor: "rgba(255, 0, 128, 0.3)" }
   };
   let currentTheme = THEMES.day;
 
@@ -115,15 +97,14 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // 3. PLAYER & GIANT AEGIS POWERUP
+  // 3. PLAYER & CHARACTERS
   // ==========================================
-  const CHARACTERS = {
-    cat: { id: 'cat', name: 'Cat', color: '#ff9800', src: 'cat.png', loaded: false, sprite: new Image() }
-  };
-
-  CHARACTERS.cat.sprite.onload = () => { CHARACTERS.cat.loaded = true; };
-  CHARACTERS.cat.sprite.src = CHARACTERS.cat.src;
-
+  const AVATARS = [
+    { id: 'cat', emoji: '🐱', name: 'Cat', color: '#ff9800', src: 'cat.png' },
+    { id: 'rocket', emoji: '🚀', name: 'Rocket', color: '#e91e63', src: 'rocket.png' },
+    { id: 'ghost', emoji: '👻', name: 'Ghost', color: '#9c27b0', src: '' }
+  ];
+  let selectedAvatarIndex = 0;
   let customAvatarImg = null;
 
   const player = {
@@ -137,12 +118,11 @@ window.addEventListener('DOMContentLoaded', () => {
     inventory: { shield: true, sword: false }
   };
 
-  // Giant Spectral Aegis Shield Rampage
   const giantShield = {
     active: false,
     pipesRemaining: 0,
-    radius: 70,
-    pulseTimer: 0
+    scale: 1.0,
+    angle: 0
   };
 
   let pipes = [];
@@ -151,38 +131,88 @@ window.addEventListener('DOMContentLoaded', () => {
   let floatingTexts = [];
 
   // ==========================================
-  // 4. INPUT & CONTROLS
+  // 4. INPUT & SPLASH SCREEN INTERACTION
   // ==========================================
-  function handleTap() {
-    initAudio();
+  function handleCanvasClick(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clickX = (e.clientX - rect.left) * scaleX;
+    let clickY = (e.clientY - rect.top) * scaleY;
+
+    if (e.touches && e.touches[0]) {
+      clickX = (e.touches[0].clientX - rect.left) * scaleX;
+      clickY = (e.touches[0].clientY - rect.top) * scaleY;
+    }
+
     if (!gameStarted) {
-      gameStarted = true;
-      resetGame();
+      // Initials Click Zone
+      if (clickX >= 110 && clickX <= 290 && clickY >= 180 && clickY <= 220) {
+        let input = prompt("Enter your 3-letter initials:", playerInitials);
+        if (input) {
+          playerInitials = input.toUpperCase().trim().substring(0, 3) || "AAA";
+          localStorage.setItem('pixeljump_initials', playerInitials);
+        }
+        return;
+      }
+
+      // Avatar Toggle Click Zone
+      if (clickX >= 110 && clickX <= 290 && clickY >= 235 && clickY <= 275) {
+        selectedAvatarIndex = (selectedAvatarIndex + 1) % AVATARS.length;
+        customAvatarImg = null; // Reset custom upload when toggling preset avatars
+        return;
+      }
+
+      // Start Button Click Zone
+      if (clickX >= 100 && clickX <= 300 && clickY >= 500 && clickY <= 555) {
+        initAudio();
+        gameStarted = true;
+        resetGame();
+        return;
+      }
       return;
     }
+
     if (gameOver) {
       resetGame();
       return;
     }
+
+    // Gameplay Jump
+    initAudio();
     player.vy = player.jumpStrength;
     playSound('jump');
   }
 
   window.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' || e.code === 'ArrowUp') handleTap();
+    if (e.code === 'Space' || e.code === 'ArrowUp') {
+      if (!gameStarted) {
+        initAudio();
+        gameStarted = true;
+        resetGame();
+      } else if (gameOver) {
+        resetGame();
+      } else {
+        initAudio();
+        player.vy = player.jumpStrength;
+        playSound('jump');
+      }
+    }
   });
+
   canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    handleTap();
+    handleCanvasClick(e);
   });
   canvas.addEventListener('mousedown', (e) => {
     e.preventDefault();
-    handleTap();
+    handleCanvasClick(e);
   });
 
-  document.getElementById('audioToggle').addEventListener('click', (e) => {
+  document.getElementById('audioToggle').addEventListener('click', () => {
     audioMuted = !audioMuted;
-    e.target.innerText = audioMuted ? '🔇 Audio Off' : '🔊 Mute Audio';
+    document.getElementById('audioToggle').innerText = audioMuted ? '🔇 Audio Off' : '🔊 Mute Audio';
   });
 
   document.getElementById('avatarUpload').addEventListener('change', (e) => {
@@ -202,12 +232,8 @@ window.addEventListener('DOMContentLoaded', () => {
   // 5. RANDOMIZED ITEM SPAWNING & COMBOS
   // ==========================================
   function spawnItem(pipeX, topHeight, gap) {
-    // 35% chance to spawn an item
     if (Math.random() < 0.35) {
-      // Completely randomized 50/50 probability between sword and shield
       const type = Math.random() < 0.5 ? 'shield' : 'sword';
-      
-      // Position safely in center of gap
       const safeY = topHeight + (gap / 2) - 10;
 
       items.push({
@@ -241,7 +267,14 @@ window.addEventListener('DOMContentLoaded', () => {
 
     score += 50;
     playSound('item');
-    spawnFloatingText("+50 GIANT AEGIS SHIELD!", player.x - 20, player.y - 30, "#ffd700");
+    spawnFloatingText("+50 KNIGHT'S AEGIS SHIELD!", player.x - 30, player.y - 30, "#ffd700");
+  }
+
+  function saveHighScore(newScore) {
+    highScores.push({ name: playerInitials, score: newScore });
+    highScores.sort((a, b) => b.score - a.score);
+    highScores = highScores.slice(0, 15); // Retain top 15
+    localStorage.setItem('pixeljump_top15', JSON.stringify(highScores));
   }
 
   function createPipeShatterParticles(x, y, width, height) {
@@ -291,7 +324,6 @@ window.addEventListener('DOMContentLoaded', () => {
     if (!gameStarted || gameOver) return;
     frameCount++;
 
-    // Theme Switcher Progression
     if (score >= 30) currentTheme = THEMES.retro;
     else if (score >= 20) currentTheme = THEMES.night;
     else if (score >= 10) currentTheme = THEMES.sunset;
@@ -330,7 +362,7 @@ window.addEventListener('DOMContentLoaded', () => {
       if (p.alpha <= 0) particles.splice(i, 1);
     }
 
-    // Collectibles
+    // Items
     for (let i = items.length - 1; i >= 0; i--) {
       const item = items[i];
       item.x -= 2;
@@ -348,9 +380,8 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Giant Aegis & Pipe Collisions
+    // Pipes & Knight Shield Collisions
     const playerCenterX = player.x + player.width / 2;
-    const playerCenterY = player.y + player.height / 2;
 
     for (let i = pipes.length - 1; i >= 0; i--) {
       const pipe = pipes[i];
@@ -359,24 +390,20 @@ window.addEventListener('DOMContentLoaded', () => {
       if (!pipe.passed && pipe.x + pipe.width < player.x) {
         pipe.passed = true;
         score++;
-        if (score > highScore) {
-          highScore = score;
-          localStorage.setItem('pixeljump_highscore', highScore);
-        }
       }
 
       if (pipe.shattered) continue;
 
       if (giantShield.active) {
-        // Check if pipe collides with Giant Shield Radius
-        if (pipe.x <= playerCenterX + giantShield.radius && pipe.x + pipe.width >= playerCenterX - giantShield.radius) {
+        // Shield impact zone centered in front of player
+        if (pipe.x <= playerCenterX + 65 && pipe.x + pipe.width >= playerCenterX - 30) {
           pipe.shattered = true;
           giantShield.pipesRemaining--;
 
           playSound('shatter');
           createPipeShatterParticles(pipe.x, 0, pipe.width, pipe.topHeight);
           createPipeShatterParticles(pipe.x, pipe.bottomY, pipe.width, canvas.height - pipe.bottomY);
-          spawnFloatingText("SHIELD SMASH!", pipe.x, player.y, "#00e676");
+          spawnFloatingText("AEGIS SHATTER!", pipe.x, player.y, "#00e676");
 
           if (giantShield.pipesRemaining <= 0) giantShield.active = false;
         }
@@ -408,8 +435,57 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // 7. RENDERING PIPELINE
+  // 7. DRAWING GRAPHICS & KITE SHIELD
   // ==========================================
+  function drawKnightKiteShield(x, y) {
+    ctx.save();
+    ctx.translate(x, y);
+
+    // Glowing Aura behind shield
+    ctx.shadowColor = "#00e676";
+    ctx.shadowBlur = 12;
+
+    // Shield Body (Kite Shape)
+    ctx.beginPath();
+    ctx.moveTo(0, -35); // Top center
+    ctx.lineTo(25, -35); // Top right
+    ctx.lineTo(22, 5);   // Mid right curve
+    ctx.lineTo(0, 40);   // Bottom point
+    ctx.lineTo(-22, 5);  // Mid left curve
+    ctx.lineTo(-25, -35); // Top left
+    ctx.closePath();
+
+    // Steel Metallic Gradient Base
+    const grad = ctx.createLinearGradient(-25, -35, 25, 40);
+    grad.addColorStop(0, '#e0e0e0');
+    grad.addColorStop(0.5, '#9e9e9e');
+    grad.addColorStop(1, '#424242');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Gold Outer Rim Border
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#ffd700';
+    ctx.stroke();
+
+    // Inner Metallic Cross Emblem
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#b71c1c'; // Crimson Shield Cross
+    ctx.fillRect(-4, -30, 8, 60);
+    ctx.fillRect(-20, -15, 40, 8);
+
+    // Center Gold Boss / Stud
+    ctx.beginPath();
+    ctx.arc(0, -11, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffd700';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
   function draw() {
     // Background Theme
     ctx.fillStyle = currentTheme.background;
@@ -425,7 +501,7 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.fill();
     });
 
-    // Theme-Driven Pipe Rendering
+    // Theme Pipes
     pipes.forEach(pipe => {
       if (pipe.shattered) return;
 
@@ -455,29 +531,18 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.restore();
     });
 
-    // GIANT SPECTRAL SHIELD SUMMONING EFFECT
-    if (giantShield.active) {
-      giantShield.pulseTimer += 0.1;
-      const pulseRadius = giantShield.radius + Math.sin(giantShield.pulseTimer) * 5;
-
-      ctx.save();
+    // Player Rendering
+    const currentAvatar = AVATARS[selectedAvatarIndex];
+    if (customAvatarImg) {
+      ctx.drawImage(customAvatarImg, player.x, player.y, player.width, player.height);
+    } else {
+      ctx.fillStyle = currentAvatar.color;
       ctx.beginPath();
-      ctx.arc(player.x + player.width / 2, player.y + player.height / 2, pulseRadius, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(0, 230, 118, 0.25)";
+      ctx.arc(player.x + player.width / 2, player.y + player.height / 2, player.width / 2, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = "#00e676";
-      ctx.lineWidth = 4;
-      ctx.shadowColor = "#00e676";
-      ctx.shadowBlur = 15;
-      ctx.stroke();
-
-      // Outer Crest Ring
-      ctx.beginPath();
-      ctx.arc(player.x + player.width / 2, player.y + player.height / 2, pulseRadius + 8, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(255, 215, 0, 0.6)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.restore();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "16px sans-serif";
+      ctx.fillText(currentAvatar.emoji, player.x + 7, player.y + 24);
     }
 
     // Standard Shield Aura
@@ -493,19 +558,9 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.restore();
     }
 
-    // Player Rendering
-    if (customAvatarImg) {
-      ctx.drawImage(customAvatarImg, player.x, player.y, player.width, player.height);
-    } else if (CHARACTERS.cat.loaded) {
-      ctx.drawImage(CHARACTERS.cat.sprite, player.x, player.y, player.width, player.height);
-    } else {
-      ctx.fillStyle = CHARACTERS.cat.color;
-      ctx.beginPath();
-      ctx.arc(player.x + player.width / 2, player.y + player.height / 2, player.width / 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "14px sans-serif";
-      ctx.fillText("🐱", player.x + 8, player.y + 23);
+    // DRAW ACTUAL KNIGHT'S KITE SHIELD WHEN ACTIVE
+    if (giantShield.active) {
+      drawKnightKiteShield(player.x + player.width + 22, player.y + player.height / 2);
     }
 
     // Floating Text
@@ -525,7 +580,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     ctx.font = "12px sans-serif";
     ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
-    ctx.fillText(`Best: ${highScore}`, 15, 48);
+    ctx.fillText(`Player: ${playerInitials}`, 15, 48);
     ctx.fillText(`${currentTheme.name} Theme`, canvas.width - 100, 38);
     ctx.fillText(GAME_VERSION, canvas.width - 55, 20);
 
@@ -538,51 +593,114 @@ window.addEventListener('DOMContentLoaded', () => {
     if (giantShield.active) {
       ctx.fillStyle = "#00e676";
       ctx.font = "bold 13px sans-serif";
-      ctx.fillText(`Giant Aegis Pipes Left: ${giantShield.pipesRemaining}`, 15, 90);
+      ctx.fillText(`Knight Shield Hits Left: ${giantShield.pipesRemaining}`, 15, 90);
     }
 
-    // RESTORED START SPLASH SCREEN
+    // ==========================================
+    // START SPLASH SCREEN & TOP 15 LEADERBOARD
+    // ==========================================
     if (!gameStarted) {
-      ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+      ctx.fillStyle = "rgba(0, 0, 0, 0.82)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
+
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 32px sans-serif";
+      ctx.font = "bold 30px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("PIXEL JUMP", canvas.width / 2, canvas.height / 2 - 50);
+      ctx.fillText("PIXEL JUMP", canvas.width / 2, 45);
+
+      // Interactive Setup Box
+      ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+      ctx.fillRect(110, 65, 180, 40);
+      ctx.strokeStyle = "#ffd700";
+      ctx.strokeRect(110, 65, 180, 40);
 
       ctx.fillStyle = "#ffd700";
-      ctx.font = "bold 18px sans-serif";
-      ctx.fillText(`HIGH SCORE: ${highScore}`, canvas.width / 2, canvas.height / 2 - 10);
+      ctx.font = "bold 14px sans-serif";
+      ctx.fillText(`INITIALS: ${playerInitials} (Tap Change)`, canvas.width / 2, 90);
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+      ctx.fillRect(110, 115, 180, 40);
+      ctx.strokeStyle = "#00e676";
+      ctx.strokeRect(110, 115, 180, 40);
+
+      ctx.fillStyle = "#00e676";
+      ctx.fillText(`AVATAR: ${customAvatarImg ? 'Custom 📁' : currentAvatar.emoji + ' ' + currentAvatar.name}`, canvas.width / 2, 140);
+
+      // Leaderboard Title
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 16px sans-serif";
+      ctx.fillText("🏆 TOP 15 LEADERBOARD 🏆", canvas.width / 2, 180);
+
+      // Leaderboard Rows
+      ctx.font = "13px monospace";
+      let startY = 205;
+      const displayScores = highScores.slice(0, 15);
+      
+      displayScores.forEach((hs, idx) => {
+        const col = idx < 8 ? 60 : 230;
+        const rowY = startY + (idx % 8) * 22;
+        ctx.textAlign = "left";
+        ctx.fillStyle = idx === 0 ? "#ffd700" : (idx === 1 ? "#c0c0c0" : (idx === 2 ? "#cd7f32" : "#ffffff"));
+        ctx.fillText(`${idx + 1}. ${hs.name} - ${hs.score}`, col, rowY);
+      });
+
+      // Start Button
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#2e7d32";
+      ctx.fillRect(100, 480, 200, 50);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(100, 480, 200, 50);
 
       ctx.fillStyle = "#ffffff";
-      ctx.font = "16px sans-serif";
-      ctx.fillText("Tap Screen or Press Space", canvas.width / 2, canvas.height / 2 + 35);
-      ctx.fillText("To Jump & Start Game", canvas.width / 2, canvas.height / 2 + 60);
+      ctx.font = "bold 18px sans-serif";
+      ctx.fillText("TAP TO START", canvas.width / 2, 512);
 
       ctx.textAlign = "left";
     }
 
-    // GAME OVER OVERLAY
+    // ==========================================
+    // GAME OVER OVERLAY & LEADERBOARD
+    // ==========================================
     if (gameOver) {
-      ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+      ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 28px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 20);
+      ctx.fillText("GAME OVER", canvas.width / 2, 50);
+
       ctx.font = "16px sans-serif";
-      ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2 + 10);
+      ctx.fillText(`Final Score (${playerInitials}): ${score}`, canvas.width / 2, 80);
+
       ctx.fillStyle = "#ffd700";
-      ctx.fillText(`High Score: ${highScore}`, canvas.width / 2, canvas.height / 2 + 35);
+      ctx.font = "bold 16px sans-serif";
+      ctx.fillText("TOP 15 HIGH SCORES", canvas.width / 2, 120);
+
+      ctx.font = "13px monospace";
+      let startY = 145;
+      highScores.slice(0, 15).forEach((hs, idx) => {
+        const col = idx < 8 ? 60 : 230;
+        const rowY = startY + (idx % 8) * 22;
+        ctx.textAlign = "left";
+        ctx.fillStyle = idx === 0 ? "#ffd700" : "#ffffff";
+        ctx.fillText(`${idx + 1}. ${hs.name} - ${hs.score}`, col, rowY);
+      });
+
+      ctx.textAlign = "center";
       ctx.fillStyle = "#ffffff";
-      ctx.fillText("Tap or Press Space to Restart", canvas.width / 2, canvas.height / 2 + 70);
+      ctx.font = "bold 16px sans-serif";
+      ctx.fillText("Tap Screen or Press Space to Restart", canvas.width / 2, 520);
       ctx.textAlign = "left";
     }
   }
 
   function endGame() {
-    if (!gameOver) playSound('hit');
+    if (!gameOver) {
+      playSound('hit');
+      saveHighScore(score);
+    }
     gameOver = true;
   }
 
