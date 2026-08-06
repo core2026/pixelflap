@@ -5,7 +5,6 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const container = document.getElementById("game-container");
 
-// Dynamic Resolution Scaler
 function resizeCanvas() {
   canvas.width = container.clientWidth || window.innerWidth;
   canvas.height = container.clientHeight || window.innerHeight;
@@ -32,13 +31,14 @@ const customAvatarInput = document.getElementById("custom-avatar-input");
 const leaderboardList = document.getElementById("leaderboard-list");
 const finalScoreEl = document.getElementById("final-score");
 
-// Cosmic Themes
-const themes = [
-  { name: "Cyber Void", bg: "#090a14", pipe: "#00e5ff", pipeBorder: "#0088cc" },
-  { name: "Deep Nebula", bg: "#12071f", pipe: "#d500f9", pipeBorder: "#aa00ff" },
-  { name: "Solar Flare", bg: "#1a0c00", pipe: "#ff9100", pipeBorder: "#ff6d00" }
+// Progressive Cosmic Theme Stages based on Score
+const themeStages = [
+  { minScore: 0,  name: "Cyber Void",  bg: "#090a14", pipe: "#00e5ff", pipeBorder: "#0088cc" },
+  { minScore: 10, name: "Deep Nebula", bg: "#12071f", pipe: "#d500f9", pipeBorder: "#aa00ff" },
+  { minScore: 25, name: "Solar Flare", bg: "#1a0c00", pipe: "#ff9100", pipeBorder: "#ff6d00" },
+  { minScore: 50, name: "Supernova",   bg: "#1c000d", pipe: "#ff1744", pipeBorder: "#d50000" }
 ];
-let currentTheme = themes[0];
+let currentTheme = themeStages[0];
 
 // Game State
 let gameState = "MENU"; // MENU, PLAYING, GAMEOVER
@@ -47,7 +47,7 @@ let frames = 0;
 let playerInitials = "";
 let selectedAvatar = "🚀";
 let customImageObj = null;
-let lastPipeTop = null; // Used for smooth pipe delta trajectory
+let lastPipeTop = null;
 
 // Dynamic Player Avatar Settings
 const player = {
@@ -57,13 +57,15 @@ const player = {
   gravity: 0.45,
   jump: -7.5,
   velocity: 0,
-  hasShield: false
+  shieldCount: 1 // Default start with 1 shield
 };
 
 // Power-Up State
 const activePowerUps = {
   slowMoTimer: 0,
-  doubleScoreTimer: 0
+  doubleScoreTimer: 0,
+  swordTimer: 0,
+  swordAngle: 0
 };
 
 // Game Objects
@@ -75,19 +77,15 @@ let debris = [];
 let particles = [];
 let popups = [];
 
-// --- WEB AUDIO API & RETRO SYNTH BGM ---
+// Audio & Vibrations
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
 let bgmTimer = null;
 let bgmStep = 0;
 
 function initAudio() {
-  if (!audioCtx) {
-    audioCtx = new AudioCtx();
-  }
-  if (audioCtx.state === "suspended") {
-    audioCtx.resume();
-  }
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === "suspended") audioCtx.resume();
 }
 
 function triggerHaptic(pattern = [30]) {
@@ -130,6 +128,14 @@ function playSound(type) {
     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
     osc.start(now);
     osc.stop(now + 0.25);
+  } else if (type === "slice") {
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(600, now);
+    osc.frequency.exponentialRampToValueAtTime(150, now + 0.15);
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+    osc.start(now);
+    osc.stop(now + 0.15);
   } else if (type === "shield_break") {
     osc.type = "square";
     osc.frequency.setValueAtTime(200, now);
@@ -182,13 +188,8 @@ function stopBGM() {
   }
 }
 
-infoBtn.addEventListener("click", () => {
-  infoModal.classList.remove("hidden");
-});
-
-closeInfoBtn.addEventListener("click", () => {
-  infoModal.classList.add("hidden");
-});
+infoBtn.addEventListener("click", () => infoModal.classList.remove("hidden"));
+closeInfoBtn.addEventListener("click", () => infoModal.classList.add("hidden"));
 
 avatarBtns.forEach(btn => {
   btn.addEventListener("click", () => {
@@ -254,9 +255,7 @@ canvas.addEventListener("touchstart", (e) => {
 }, { passive: false });
 
 canvas.addEventListener("mousedown", (e) => {
-  if (gameState === "PLAYING") {
-    jump();
-  }
+  if (gameState === "PLAYING") jump();
 });
 
 startBtn.addEventListener("click", (e) => {
@@ -294,13 +293,16 @@ changeCharBtn.addEventListener("click", (e) => {
 
 function startGame() {
   resizeCanvas();
-  currentTheme = themes[Math.floor(Math.random() * themes.length)];
+  currentTheme = themeStages[0];
 
   player.y = canvas.height / 2;
   player.velocity = player.jump;
-  player.hasShield = false;
+  player.shieldCount = 1; // Default start with 1 shield
+
   activePowerUps.slowMoTimer = 0;
   activePowerUps.doubleScoreTimer = 0;
+  activePowerUps.swordTimer = 0;
+  activePowerUps.swordAngle = 0;
 
   pipes = [];
   stars = [];
@@ -337,16 +339,32 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
+function updateThemeProgress() {
+  for (let i = themeStages.length - 1; i >= 0; i--) {
+    if (score >= themeStages[i].minScore) {
+      if (currentTheme.name !== themeStages[i].name) {
+        currentTheme = themeStages[i];
+        addPopupText(`REALM: ${currentTheme.name.toUpperCase()}!`, canvas.width / 2 - 50, 100, currentTheme.pipe);
+      }
+      break;
+    }
+  }
+}
+
 function update() {
   if (gameState !== "PLAYING") return;
 
   frames++;
+  updateThemeProgress();
 
   const isSlowMo = activePowerUps.slowMoTimer > 0;
   if (isSlowMo) activePowerUps.slowMoTimer--;
   if (activePowerUps.doubleScoreTimer > 0) activePowerUps.doubleScoreTimer--;
+  if (activePowerUps.swordTimer > 0) {
+    activePowerUps.swordTimer--;
+    activePowerUps.swordAngle += 0.22; // Spinning speed
+  }
 
-  // Smooth base speed progression
   const baseSpeed = Math.min(2.1 + score * 0.03, 3.1);
   const speedMult = isSlowMo ? 0.55 : 1.0;
   const gameSpeed = baseSpeed * speedMult;
@@ -354,14 +372,15 @@ function update() {
   player.velocity += player.gravity * (isSlowMo ? 0.75 : 1.0);
   player.y += player.velocity;
 
+  // Screen Bounds Collision
   if (frames > 5) {
     if (player.y + player.size >= canvas.height || player.y <= 0) {
-      if (player.hasShield) {
-        player.hasShield = false;
+      if (player.shieldCount > 0) {
+        player.shieldCount--;
         player.velocity = -6;
         playSound("shield_break");
         triggerHaptic([40, 30, 40]);
-        addPopupText("SHIELD BROKEN!", player.x, player.y - 10, "#ff1744");
+        addPopupText(`SHIELD BREAK! (${player.shieldCount} REMAINING)`, player.x, player.y - 10, "#ff1744");
       } else {
         triggerGameOver();
         return;
@@ -375,7 +394,7 @@ function update() {
     if (d.x < 0) d.x = canvas.width;
   });
 
-  // Balanced spawn distance between pipes
+  // Pipe Spawning Logic
   const spawnRate = isSlowMo ? 140 : 105;
   if (frames % spawnRate === 0) {
     const gap = Math.max(195 - score * 2, 140);
@@ -386,7 +405,6 @@ function update() {
     if (lastPipeTop === null) {
       topHeight = Math.floor(Math.random() * (maxTop - minTop + 1)) + minTop;
     } else {
-      // FIX: Clamp maximum vertical shift to 120px from previous pipe gap
       const maxDelta = 120;
       const targetMin = Math.max(minTop, lastPipeTop - maxDelta);
       const targetMax = Math.min(maxTop, lastPipeTop + maxDelta);
@@ -407,8 +425,8 @@ function update() {
     const rand = Math.random();
     if (rand < 0.35) {
       stars.push({ x: canvas.width + 25, y: topHeight + gap / 2, size: 14, collected: false });
-    } else if (rand > 0.75) {
-      const types = ["shield", "slowMo", "2x"];
+    } else if (rand > 0.65) {
+      const types = ["shield", "sword", "slowMo", "2x"];
       const pType = types[Math.floor(Math.random() * types.length)];
       powerUpItems.push({ x: canvas.width + 25, y: topHeight + gap / 2, type: pType, collected: false });
     }
@@ -424,6 +442,12 @@ function update() {
     });
   }
 
+  const pCenterX = player.x + player.size / 2;
+  const pCenterY = player.y + player.size / 2;
+  const swordActive = activePowerUps.swordTimer > 0;
+  const swordTipX = pCenterX + Math.cos(activePowerUps.swordAngle) * 55;
+  const swordTipY = pCenterY + Math.sin(activePowerUps.swordAngle) * 55;
+
   pipes.forEach(p => {
     p.x -= gameSpeed;
 
@@ -435,17 +459,29 @@ function update() {
     const currentTop = p.top + (p.isMoving ? p.offset : 0);
     const currentBottom = p.bottom - (p.isMoving ? p.offset : 0);
 
+    // Sword Pipe Destructor Check
+    if (swordActive && p.x < swordTipX + 15 && p.x + 45 > swordTipX - 15) {
+      if (swordTipY < currentTop || swordTipY > canvas.height - currentBottom) {
+        p.x = -100;
+        playSound("slice");
+        triggerHaptic([30, 20]);
+        addPopupText("PIPE SLICED! 🗡️", pCenterX, pCenterY - 15, "#ffea00");
+        return;
+      }
+    }
+
+    // Player Collision Check
     if (
       player.x < p.x + 45 &&
       player.x + player.size > p.x &&
       (player.y < currentTop || player.y + player.size > canvas.height - currentBottom)
     ) {
-      if (player.hasShield) {
-        player.hasShield = false;
+      if (player.shieldCount > 0) {
+        player.shieldCount--;
         p.x = -100;
         playSound("shield_break");
         triggerHaptic([40, 30, 40]);
-        addPopupText("SHIELD BROKEN!", player.x, player.y - 10, "#ff1744");
+        addPopupText(`SHIELD BREAK! (${player.shieldCount} REMAINING)`, player.x, player.y - 10, "#ff1744");
       } else {
         triggerGameOver();
         return;
@@ -466,15 +502,20 @@ function update() {
     c.x += c.vx;
     c.y += c.vy;
 
-    const pX = player.x + player.size / 2;
-    const pY = player.y + player.size / 2;
-    if (Math.hypot(pX - c.x, pY - c.y) < player.size / 2 + c.size) {
-      if (player.hasShield) {
-        player.hasShield = false;
+    if (swordActive && Math.hypot(swordTipX - c.x, swordTipY - c.y) < 20) {
+      c.x = -100;
+      playSound("slice");
+      addPopupText("COMET SLICED! 🗡️", pCenterX, pCenterY - 15, "#ffea00");
+      return;
+    }
+
+    if (Math.hypot(pCenterX - c.x, pCenterY - c.y) < player.size / 2 + c.size) {
+      if (player.shieldCount > 0) {
+        player.shieldCount--;
         c.x = -100;
         playSound("shield_break");
         triggerHaptic([40, 30, 40]);
-        addPopupText("SHIELD BROKEN!", player.x, player.y - 10, "#ff1744");
+        addPopupText(`SHIELD BREAK! (${player.shieldCount} REMAINING)`, player.x, player.y - 10, "#ff1744");
       } else {
         triggerGameOver();
         return;
@@ -483,12 +524,9 @@ function update() {
   });
   comets = comets.filter(c => c.x > -40);
 
-  const playerCenterX = player.x + player.size / 2;
-  const playerCenterY = player.y + player.size / 2;
-
   stars.forEach(s => {
     s.x -= gameSpeed;
-    if (!s.collected && Math.hypot(playerCenterX - s.x, playerCenterY - s.y) < player.size / 2 + s.size) {
+    if (!s.collected && Math.hypot(pCenterX - s.x, pCenterY - s.y) < player.size / 2 + s.size) {
       s.collected = true;
       const pts = activePowerUps.doubleScoreTimer > 0 ? 10 : 5;
       score += pts;
@@ -501,14 +539,17 @@ function update() {
 
   powerUpItems.forEach(pu => {
     pu.x -= gameSpeed;
-    if (!pu.collected && Math.hypot(playerCenterX - pu.x, playerCenterY - pu.y) < player.size / 2 + 16) {
+    if (!pu.collected && Math.hypot(pCenterX - pu.x, pCenterY - pu.y) < player.size / 2 + 16) {
       pu.collected = true;
       playSound("powerup");
       triggerHaptic([50, 50]);
 
       if (pu.type === "shield") {
-        player.hasShield = true;
-        addPopupText("SHIELD!", pu.x, pu.y, "#00e5ff");
+        player.shieldCount = Math.min(player.shieldCount + 1, 3); // Stack shields max 3
+        addPopupText(`SHIELD STACK! (${player.shieldCount}x)`, pu.x, pu.y, "#00e5ff");
+      } else if (pu.type === "sword") {
+        activePowerUps.swordTimer = 480; // 8 seconds
+        addPopupText("SPINNING SWORD!", pu.x, pu.y, "#ffea00");
       } else if (pu.type === "slowMo") {
         activePowerUps.slowMoTimer = 300;
         addPopupText("SLOW-MO!", pu.x, pu.y, "#d500f9");
@@ -594,7 +635,7 @@ function render() {
     ctx.font = "20px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    const icon = pu.type === "shield" ? "🛡️" : pu.type === "slowMo" ? "⏱️" : "⚡";
+    const icon = pu.type === "shield" ? "🛡️" : pu.type === "sword" ? "🗡️" : pu.type === "slowMo" ? "⏱️" : "⚡";
     ctx.fillText(icon, pu.x, pu.y);
     ctx.restore();
   });
@@ -603,6 +644,7 @@ function render() {
   const centerY = player.y + player.size / 2;
   const radius = player.size / 2;
 
+  // Render Player Avatar
   if (customImageObj) {
     ctx.save();
     ctx.beginPath();
@@ -626,15 +668,35 @@ function render() {
     ctx.fillText(selectedAvatar, centerX, centerY);
   }
 
-  if (player.hasShield) {
+  // Render Stacked Shield Energy Rings
+  if (player.shieldCount > 0) {
+    for (let s = 1; s <= player.shieldCount; s++) {
+      ctx.save();
+      ctx.strokeStyle = s === 1 ? "#00e5ff" : s === 2 ? "#76ff03" : "#ffd700";
+      ctx.lineWidth = 2.5;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = ctx.strokeStyle;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius + 4 + s * 4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // Render Orbiting Spinning Blade
+  if (activePowerUps.swordTimer > 0) {
+    const swordX = centerX + Math.cos(activePowerUps.swordAngle) * 55;
+    const swordY = centerY + Math.sin(activePowerUps.swordAngle) * 55;
+
     ctx.save();
-    ctx.strokeStyle = "#00e5ff";
-    ctx.lineWidth = 3;
+    ctx.translate(swordX, swordY);
+    ctx.rotate(activePowerUps.swordAngle + Math.PI / 4);
+    ctx.font = "24px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     ctx.shadowBlur = 12;
-    ctx.shadowColor = "#00e5ff";
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, radius + 6, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.shadowColor = "#ffea00";
+    ctx.fillText("🗡️", 0, 0);
     ctx.restore();
   }
 
@@ -647,7 +709,14 @@ function render() {
     ctx.restore();
   });
 
+  // HUD Active Timers
   let hudOffset = 70;
+  if (activePowerUps.swordTimer > 0) {
+    ctx.fillStyle = "#ffea00";
+    ctx.font = "bold 13px 'Segoe UI', sans-serif";
+    ctx.fillText(`🗡️ SWORD: ${(activePowerUps.swordTimer / 60).toFixed(1)}s`, 10, hudOffset);
+    hudOffset += 20;
+  }
   if (activePowerUps.slowMoTimer > 0) {
     ctx.fillStyle = "#d500f9";
     ctx.font = "bold 13px 'Segoe UI', sans-serif";
