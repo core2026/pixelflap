@@ -1,448 +1,332 @@
-// ==========================================
-// CONFIGURATION
-// ==========================================
-const WORKER_URL = "https://game-leaderboard-api.acekallas.workers.dev";
+// Worker API Endpoint
+const WORKER_URL = "https://pixelflap-main.acekallas.workers.dev";
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-function resizeCanvas() {
-  canvas.width = canvas.parentElement.clientWidth;
-  canvas.height = canvas.parentElement.clientHeight;
-}
-resizeCanvas();
-window.addEventListener("resize", resizeCanvas);
+// UI Elements
+const startScreen = document.getElementById("start-screen");
+const gameOverScreen = document.getElementById("game-over-screen");
+const startBtn = document.getElementById("start-btn");
+const restartBtn = document.getElementById("restart-btn");
+const initialsInput = document.getElementById("player-initials");
+const avatarBtns = document.querySelectorAll(".avatar-btn");
+const customAvatarInput = document.getElementById("custom-avatar-input");
+const leaderboardList = document.getElementById("leaderboard-list");
+const finalScoreEl = document.getElementById("final-score");
+const container = document.getElementById("game-container");
+
+// Cosmic Themes
+const themes = [
+  { name: "Cyber Void", bg: "#090a14", pipe: "#00e5ff", pipeBorder: "#0088cc" },
+  { name: "Deep Nebula", bg: "#12071f", pipe: "#d500f9", pipeBorder: "#aa00ff" },
+  { name: "Solar Flare", bg: "#1a0c00", pipe: "#ff9100", pipeBorder: "#ff6d00" }
+];
+let currentTheme = themes[0];
 
 // Game State
 let gameState = "MENU"; // MENU, PLAYING, GAMEOVER
 let score = 0;
-let bestScore = localStorage.getItem("pixeljump_best") || 0;
-let selectedChar = "cat";
-let customImage = null;
+let frames = 0;
+let playerInitials = "ACE";
+let selectedAvatar = "🚀";
+let customImageObj = null;
 
-// Physics Engine Vars
-let birdY = canvas.height / 2;
-let velocity = 0;
-const gravity = 0.38;
-const jump = -7.5;
+// Player Settings
+const player = {
+  x: 60,
+  y: 250,
+  width: 32,
+  height: 32,
+  gravity: 0.45,
+  jump: -7.5,
+  velocity: 0
+};
 
-// Dynamic Sizes
-let currentBirdRadius = 22;
-let currentPipeGap = 160;
-let currentPipeWidth = 50;
-
-// Obstacles & Particles
+// Game Arrays
 let pipes = [];
-let particles = [];
-let stars = [];
-let frameCount = 0;
+let stars = [];      // Bonus floating star collectibles (+5 pts)
+let debris = [];     // Background space dust/asteroids
+let particles = [];  // Trail particles
 
-// Dynamic Theme Presets (Chosen randomly on game start)
-const THEME_PRESETS = [
-  { name: "Synthwave Dusk", top: "#1e1b4b", bottom: "#311042", crystal1: "#a855f7", crystal2: "#3b82f6", glow: "#a855f7", trail: "#f97316" },
-  { name: "Cyber Emerald", top: "#022c22", bottom: "#064e3b", crystal1: "#10b981", crystal2: "#06b6d4", glow: "#10b981", trail: "#34d399" },
-  { name: "Neon Sunset", top: "#450a0a", bottom: "#7c2d12", crystal1: "#f97316", crystal2: "#eab308", glow: "#f97316", trail: "#facc15" },
-  { name: "Deep Void", top: "#030712", bottom: "#111827", crystal1: "#6366f1", crystal2: "#a855f7", glow: "#818cf8", trail: "#c084fc" },
-  { name: "Electric Sakura", top: "#500724", bottom: "#831843", crystal1: "#f472b6", crystal2: "#fb7185", glow: "#f472b6", trail: "#fbcfe8" }
-];
-let activeTheme = THEME_PRESETS[0];
-
-// UI Elements
-const charSelectOverlay = document.getElementById("character-select");
-const gameOverOverlay = document.getElementById("game-over");
-const startBtn = document.getElementById("startBtn");
-const retryBtn = document.getElementById("retryBtn");
-const changeCharBtn = document.getElementById("changeCharBtn");
-const imageUpload = document.getElementById("imageUpload");
-const uploadStatus = document.getElementById("uploadStatus");
-const playerNameInput = document.getElementById("playerName");
-
-// Restrict initials input to max 3 uppercase letters (allows 1, 2, or 3 letters)
-playerNameInput.addEventListener("input", (e) => {
-  e.target.value = e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase();
+// Initialize Controls & Avatars
+avatarBtns.forEach(btn => {
+  btn.addEventListener("click", () => {
+    avatarBtns.forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    selectedAvatar = btn.getAttribute("data-avatar");
+    customImageObj = null;
+  });
 });
 
-// Setup Background Starfield
-for (let i = 0; i < 40; i++) {
-  stars.push({
-    x: Math.random() * canvas.width,
-    y: Math.random() * canvas.height,
-    size: Math.random() * 2 + 0.5,
-    speed: Math.random() * 0.5 + 0.2
-  });
-}
-
-function updateGameplayDimensions() {
-  if (selectedChar === "custom") {
-    currentBirdRadius = 30;
-    currentPipeGap = 195;
-    currentPipeWidth = 45;
-  } else {
-    currentBirdRadius = 22;
-    currentPipeGap = 160;
-    currentPipeWidth = 50;
-  }
-}
-
-// ==========================================
-// CUSTOM IMAGE UPLOADER & CHAR PICKER
-// ==========================================
-imageUpload.addEventListener("change", (e) => {
+customAvatarInput.addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (file) {
     const reader = new FileReader();
-    reader.onload = function (event) {
+    reader.onload = function(evt) {
       const img = new Image();
-      img.onload = function () {
-        customImage = img;
-        selectedChar = "custom";
-        document.querySelectorAll(".char-btn").forEach(b => b.classList.remove("active"));
-        uploadStatus.innerText = "✓ Avatar Loaded!";
-        updateGameplayDimensions();
+      img.onload = () => {
+        customImageObj = img;
+        avatarBtns.forEach(b => b.classList.remove("active"));
       };
-      img.src = event.target.result;
+      img.src = evt.target.result;
     };
     reader.readAsDataURL(file);
   }
 });
 
-document.querySelectorAll(".char-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".char-btn").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    selectedChar = btn.dataset.char;
-    customImage = null;
-    uploadStatus.innerText = "";
-    updateGameplayDimensions();
-  });
-});
-
-// ==========================================
-// NAVIGATION & OVERLAY CONTROLS
-// ==========================================
-startBtn.addEventListener("click", startGame);
-
-retryBtn.addEventListener("click", () => {
-  gameOverOverlay.classList.add("hidden");
-  resetGameVars();
-  gameState = "PLAYING";
-});
-
-changeCharBtn.addEventListener("click", () => {
-  gameOverOverlay.classList.add("hidden");
-  charSelectOverlay.classList.remove("hidden");
-  gameState = "MENU";
-  resetGameVars();
-});
-
-function startGame() {
-  const initials = playerNameInput.value.trim();
-  // Validates length to be strictly between 1 and 3 characters
-  if (initials.length < 1 || initials.length > 3) {
-    alert("Please enter 1 to 3 letters for your initials.");
-    playerNameInput.focus();
-    return;
+function jump() {
+  if (gameState === "PLAYING") {
+    player.velocity = player.jump;
+    // Spawn jump trail particles
+    for(let i = 0; i < 5; i++) {
+      particles.push({
+        x: player.x + 10,
+        y: player.y + player.height,
+        vx: (Math.random() - 0.5) * 2 - 2,
+        vy: Math.random() * 2 + 1,
+        life: 15,
+        color: currentTheme.pipe
+      });
+    }
   }
-
-  charSelectOverlay.classList.add("hidden");
-  gameOverOverlay.classList.add("hidden");
-  resetGameVars();
-  gameState = "PLAYING";
 }
 
-function resetGameVars() {
-  birdY = canvas.height / 2;
-  velocity = 0;
-  pipes = [];
-  particles = [];
-  score = 0;
-  frameCount = 0;
-  
-  // Pick a random theme layout every time a fresh round starts
-  activeTheme = THEME_PRESETS[Math.floor(Math.random() * THEME_PRESETS.length)];
-  
-  updateGameplayDimensions();
-}
-
-// Controls
 window.addEventListener("keydown", (e) => {
-  if (e.code === "Space") handleAction();
+  if (e.code === "Space" || e.code === "ArrowUp") jump();
 });
 canvas.addEventListener("touchstart", (e) => {
   e.preventDefault();
-  handleAction();
-}, { passive: false });
-canvas.addEventListener("mousedown", handleAction);
+  jump();
+});
+canvas.addEventListener("mousedown", jump);
 
-function handleAction() {
-  if (gameState === "PLAYING") {
-    velocity = jump;
+// Start / Restart Handlers
+startBtn.addEventListener("click", startGame);
+restartBtn.addEventListener("click", () => {
+  gameOverScreen.classList.add("hidden");
+  startGame();
+});
+
+function startGame() {
+  const inputVal = initialsInput.value.trim().toUpperCase();
+  playerInitials = inputVal.length > 0 ? inputVal.substring(0, 3) : "ACE";
+
+  // Pick random cosmic theme
+  currentTheme = themes[Math.floor(Math.random() * themes.length)];
+
+  player.y = 250;
+  player.velocity = 0;
+  pipes = [];
+  stars = [];
+  particles = [];
+  score = 0;
+  frames = 0;
+
+  // Initialize background ambient space debris
+  debris = [];
+  for (let i = 0; i < 20; i++) {
+    debris.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      size: Math.random() * 2 + 1,
+      speed: Math.random() * 1.5 + 0.5
+    });
   }
+
+  startScreen.classList.add("hidden");
+  gameState = "PLAYING";
 }
 
-// ==========================================
-// RENDER HELPERS & PARTICLES
-// ==========================================
-function spawnParticle(x, y) {
-  particles.push({
-    x: x - currentBirdRadius / 2,
-    y: y + (Math.random() * 10 - 5),
-    vx: -Math.random() * 2 - 1,
-    vy: Math.random() * 2 - 1,
-    size: Math.random() * 4 + 2,
-    alpha: 1.0,
-    color: activeTheme.trail
-  });
-}
-
-function drawPlayer(x, y) {
-  ctx.save();
-  ctx.translate(x, y);
-
-  if (selectedChar === "custom" && customImage) {
-    ctx.beginPath();
-    ctx.arc(0, 0, currentBirdRadius, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.clip();
-    ctx.drawImage(
-      customImage, 
-      -currentBirdRadius, 
-      -currentBirdRadius, 
-      currentBirdRadius * 2, 
-      currentBirdRadius * 2
-    );
-  } else if (selectedChar === "cat") {
-    ctx.fillStyle = "#f97316";
-    ctx.beginPath();
-    ctx.arc(0, 0, currentBirdRadius, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = "#f97316";
-    ctx.beginPath();
-    ctx.moveTo(-16, -10); ctx.lineTo(-22, -26); ctx.lineTo(-6, -18); ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(16, -10); ctx.lineTo(22, -26); ctx.lineTo(6, -18); ctx.fill();
-
-    ctx.fillStyle = "#f472b6";
-    ctx.beginPath();
-    ctx.moveTo(-14, -12); ctx.lineTo(-19, -22); ctx.lineTo(-8, -17); ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(14, -12); ctx.lineTo(19, -22); ctx.lineTo(8, -17); ctx.fill();
-
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath(); ctx.arc(-7, -2, 6, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(7, -2, 6, 0, Math.PI * 2); ctx.fill();
-
-    ctx.fillStyle = "#000000";
-    ctx.beginPath(); ctx.arc(-6, -2, 3, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(8, -2, 3, 0, Math.PI * 2); ctx.fill();
-
-    ctx.fillStyle = "#f472b6";
-    ctx.beginPath();
-    ctx.moveTo(0, 3); ctx.lineTo(-3, 7); ctx.lineTo(3, 7); ctx.fill();
-
-  } else if (selectedChar === "star") {
-    ctx.fillStyle = "#facc15";
-    ctx.beginPath();
-    for (let i = 0; i < 5; i++) {
-      ctx.lineTo(
-        Math.cos(((18 + i * 72) * Math.PI) / 180) * currentBirdRadius,
-        -Math.sin(((18 + i * 72) * Math.PI) / 180) * currentBirdRadius
-      );
-      ctx.lineTo(
-        Math.cos(((54 + i * 72) * Math.PI) / 180) * (currentBirdRadius / 2),
-        -Math.sin(((54 + i * 72) * Math.PI) / 180) * (currentBirdRadius / 2)
-      );
-    }
-    ctx.closePath();
-    ctx.fill();
-
-  } else {
-    ctx.fillStyle = "#eab308";
-    ctx.beginPath(); ctx.arc(0, 0, currentBirdRadius, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#ca8a04";
-    ctx.beginPath(); ctx.ellipse(-18, 0, 6, 14, Math.PI / 6, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(18, 0, 6, 14, -Math.PI / 6, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#000000";
-    ctx.beginPath(); ctx.arc(-6, -3, 3, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(6, -3, 3, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(0, 4, 4, 0, Math.PI * 2); ctx.fill();
-  }
-
-  ctx.restore();
-}
-
-// ==========================================
-// MAIN LOOP & PHYSICS
-// ==========================================
-function update() {
-  stars.forEach((s) => {
-    s.x -= s.speed;
-    if (s.x < 0) s.x = canvas.width;
-  });
-
-  if (gameState !== "PLAYING") return;
-
-  velocity += gravity;
-  birdY += velocity;
-
-  if (frameCount % 2 === 0) {
-    spawnParticle(80, birdY);
-  }
-
-  for (let i = particles.length - 1; i >= 0; i--) {
-    let p = particles[i];
-    p.x += p.vx;
-    p.y += p.vy;
-    p.alpha -= 0.03;
-    if (p.alpha <= 0) particles.splice(i, 1);
-  }
-
-  if (birdY + currentBirdRadius >= canvas.height || birdY - currentBirdRadius <= 0) {
-    endGame();
-  }
-
-  frameCount++;
-  if (frameCount % 90 === 0) {
-    const topHeight = Math.random() * (canvas.height - currentPipeGap - 120) + 40;
-    pipes.push({ x: canvas.width, top: topHeight, passed: false });
-  }
-
-  for (let i = pipes.length - 1; i >= 0; i--) {
-    pipes[i].x -= 2.5;
-
-    if (!pipes[i].passed && pipes[i].x < 80) {
-      pipes[i].passed = true;
-      score++;
-    }
-
-    const p = pipes[i];
-    if (
-      80 + currentBirdRadius > p.x &&
-      80 - currentBirdRadius < p.x + currentPipeWidth &&
-      (birdY - currentBirdRadius < p.top || birdY + currentBirdRadius > p.top + currentPipeGap)
-    ) {
-      endGame();
-    }
-
-    if (pipes[i].x + currentPipeWidth < 0) {
-      pipes.splice(i, 1);
-    }
-  }
-}
-
-function draw() {
-  // Render active randomized theme background gradient
-  const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  skyGrad.addColorStop(0, activeTheme.top);
-  skyGrad.addColorStop(1, activeTheme.bottom);
-  ctx.fillStyle = skyGrad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Parallax Starfield
-  ctx.fillStyle = "#ffffff";
-  stars.forEach((s) => {
-    ctx.globalAlpha = 0.6;
-    ctx.fillRect(s.x, s.y, s.size, s.size);
-  });
-  ctx.globalAlpha = 1.0;
-
-  // Particle Trail
-  particles.forEach((p) => {
-    ctx.save();
-    ctx.globalAlpha = p.alpha;
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  });
-
-  // Pulsing Crystal Pillars based on active theme
-  pipes.forEach((p) => {
-    const pulse = Math.sin(frameCount * 0.05) * 0.2 + 0.8;
-    const crystalGrad = ctx.createLinearGradient(p.x, 0, p.x + currentPipeWidth, 0);
-    crystalGrad.addColorStop(0, activeTheme.crystal1);
-    crystalGrad.addColorStop(1, activeTheme.crystal2);
-
-    ctx.fillStyle = crystalGrad;
-    ctx.shadowBlur = 12 * pulse;
-    ctx.shadowColor = activeTheme.glow;
-
-    // Top Crystal
-    ctx.fillRect(p.x, 0, currentPipeWidth, p.top);
-    // Bottom Crystal
-    ctx.fillRect(p.x, p.top + currentPipeGap, currentPipeWidth, canvas.height - (p.top + currentPipeGap));
-    
-    ctx.shadowBlur = 0;
-  });
-
-  if (gameState === "PLAYING") {
-    drawPlayer(80, birdY);
-  }
-
-  if (gameState === "PLAYING") {
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 32px sans-serif";
-    ctx.shadowBlur = 8;
-    ctx.shadowColor = "rgba(0,0,0,0.5)";
-    ctx.fillText(score, canvas.width / 2 - 10, 50);
-    ctx.shadowBlur = 0;
-  }
-}
-
+// Main Game Loop
 function loop() {
   update();
-  draw();
+  render();
   requestAnimationFrame(loop);
 }
-loop();
 
-// ==========================================
-// HIGH SCORE & LEADERBOARD API INTEGRATION
-// ==========================================
-function endGame() {
-  gameState = "GAMEOVER";
-  document.getElementById("finalScore").innerText = score;
+function update() {
+  if (gameState !== "PLAYING") return;
 
-  if (score > bestScore) {
-    bestScore = score;
-    localStorage.setItem("pixeljump_best", bestScore);
+  frames++;
+  player.velocity += player.gravity;
+  player.y += player.velocity;
+
+  // Floor / Ceiling collisions
+  if (player.y + player.height >= canvas.height || player.y <= 0) {
+    triggerGameOver();
   }
-  document.getElementById("bestScore").innerText = bestScore;
 
-  gameOverOverlay.classList.remove("hidden");
+  // Update Background Debris
+  debris.forEach(d => {
+    d.x -= d.speed;
+    if (d.x < 0) d.x = canvas.width;
+  });
 
-  const initials = (playerNameInput.value || "ACE").toUpperCase();
-  submitScore(initials, score);
+  // Spawn Obstacles (Pipes)
+  if (frames % 90 === 0) {
+    const gap = 130;
+    const minTop = 40;
+    const maxTop = canvas.height - gap - 60;
+    const topHeight = Math.floor(Math.random() * (maxTop - minTop + 1)) + minTop;
+
+    pipes.push({
+      x: canvas.width,
+      top: topHeight,
+      bottom: canvas.height - topHeight - gap,
+      passed: false
+    });
+
+    // 40% chance to spawn a bonus floating star collectible (+5 pts)
+    if (Math.random() < 0.4) {
+      stars.push({
+        x: canvas.width + 25,
+        y: topHeight + gap / 2,
+        size: 12,
+        collected: false
+      });
+    }
+  }
+
+  // Update Pipes & Check Collisions
+  pipes.forEach(p => {
+    p.x -= 2.5;
+
+    // Collision Check
+    if (
+      player.x < p.x + 45 &&
+      player.x + player.width > p.x &&
+      (player.y < p.top || player.y + player.height > canvas.height - p.bottom)
+    ) {
+      triggerGameOver();
+    }
+
+    // Score Check
+    if (p.x + 45 < player.x && !p.passed) {
+      score++;
+      p.passed = true;
+    }
+  });
+
+  // Remove Off-screen Pipes
+  pipes = pipes.filter(p => p.x > -50);
+
+  // Update Star Collectibles (+5 points)
+  stars.forEach(s => {
+    s.x -= 2.5;
+    if (!s.collected && Math.hypot(player.x - s.x, player.y - s.y) < 25) {
+      s.collected = true;
+      score += 5; // Bonus Points!
+    }
+  });
+  stars = stars.filter(s => s.x > -20 && !s.collected);
+
+  // Update Particle Trail
+  particles.forEach(pt => {
+    pt.x += pt.vx;
+    pt.y += pt.vy;
+    pt.life--;
+  });
+  particles = particles.filter(pt => pt.life > 0);
+}
+
+function render() {
+  // Background
+  ctx.fillStyle = currentTheme.bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Render Background Debris
+  ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+  debris.forEach(d => {
+    ctx.beginPath();
+    ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Render Jump Particles
+  particles.forEach(pt => {
+    ctx.fillStyle = pt.color;
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Render Pipes
+  pipes.forEach(p => {
+    ctx.fillStyle = currentTheme.pipe;
+    ctx.strokeStyle = currentTheme.pipeBorder;
+    ctx.lineWidth = 3;
+
+    // Top Pipe
+    ctx.fillRect(p.x, 0, 45, p.top);
+    ctx.strokeRect(p.x, 0, 45, p.top);
+
+    // Bottom Pipe
+    ctx.fillRect(p.x, canvas.height - p.bottom, 45, p.bottom);
+    ctx.strokeRect(p.x, canvas.height - p.bottom, 45, p.bottom);
+  });
+
+  // Render Star Collectibles
+  stars.forEach(s => {
+    ctx.fillStyle = "#ffd700";
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "#ffd700";
+  });
+  ctx.shadowBlur = 0; // Reset shadow
+
+  // Render Player / Avatar
+  if (customImageObj) {
+    ctx.drawImage(customImageObj, player.x, player.y, player.width, player.height);
+  } else {
+    ctx.font = "28px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(selectedAvatar, player.x + player.width / 2, player.y + player.height / 2);
+  }
+
+  // Render Live Score Counter
+  if (gameState === "PLAYING") {
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 24px 'Segoe UI', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(`SCORE: ${score}`, canvas.width / 2, 40);
+  }
+}
+
+// Game Over & Leaderboard Handling
+function triggerGameOver() {
+  gameState = "GAMEOVER";
+  container.classList.add("shake");
+  setTimeout(() => container.classList.remove("shake"), 300);
+
+  finalScoreEl.textContent = `${playerInitials} - Final Score: ${score}`;
+  gameOverScreen.classList.remove("hidden");
+
+  submitScore(playerInitials, score);
 }
 
 async function submitScore(name, scoreVal) {
-  const listEl = document.getElementById("leaderboardList");
-  listEl.innerHTML = "<li>Updating leaderboard...</li>";
+  leaderboardList.innerHTML = `<li class="loading">Submitting & updating leaderboard...</li>`;
 
   try {
-    if (scoreVal > 0) {
-      await fetch(`${WORKER_URL}/api/leaderboard`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, score: scoreVal }),
-      });
-    }
+    // 1. Post score to live Cloudflare D1 Worker
+    await fetch(`${WORKER_URL}/api/leaderboard`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, score: scoreVal })
+    });
 
-    // Fetch Top 15 High Scores
+    // 2. Fetch updated Top 15 Leaderboard
     const res = await fetch(`${WORKER_URL}/api/leaderboard`);
     const scores = await res.json();
 
-    listEl.innerHTML = "";
-    if (!scores || scores.length === 0) {
-      listEl.innerHTML = "<li>No scores yet. Be the first!</li>";
-      return;
-    }
-
+    leaderboardList.innerHTML = "";
     scores.forEach((entry, idx) => {
       const li = document.createElement("li");
-      
+
       let formattedTime = "";
       if (entry.created_at) {
         const d = new Date(entry.created_at);
@@ -456,18 +340,21 @@ async function submitScore(name, scoreVal) {
           <strong class="score-val">${entry.score}</strong>
         </span>
       `;
-      listEl.appendChild(li);
+      leaderboardList.appendChild(li);
     });
   } catch (err) {
-    listEl.innerHTML = "<li>Unable to load live scores</li>";
-    console.error("Leaderboard Error:", err);
+    console.error("Leaderboard error:", err);
+    leaderboardList.innerHTML = `<li>Error loading scores. Try again later!</li>`;
   }
 }
 
 function htmlEscape(str) {
   return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
+
+// Start Main Render Loop
+loop();

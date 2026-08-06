@@ -1,76 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>PixelJump</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PixelJump - Dynamic Cosmic Flight</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="game-container">
-    <canvas id="gameCanvas"></canvas>
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
 
-    <!-- UI Overlay: Character Select & Splash -->
-    <div id="character-select" class="overlay">
-      <h1>PIXELJUMP</h1>
-      <p class="subtitle">Select or upload your character:</p>
+    <!-- Pre-game Customization Screen -->
+    <div id="start-screen" class="overlay">
+      <h1 class="title">PIXEL JUMP</h1>
       
-      <div class="character-grid">
-        <button class="char-btn active" data-char="cat">
-          <div class="char-preview cat-icon"></div>
-          <span>Cat</span>
-        </button>
-        <button class="char-btn" data-char="dog">
-          <div class="char-preview dog-icon"></div>
-          <span>Dog</span>
-        </button>
-        <button class="char-btn" data-char="star">
-          <div class="char-preview star-icon"></div>
-          <span>Star</span>
-        </button>
+      <div class="input-group">
+        <label for="player-initials">Enter Initials (1-3 Chars):</label>
+        <input type="text" id="player-initials" maxlength="3" placeholder="ACE" autocomplete="off">
       </div>
 
-      <!-- Custom Image Upload Feature -->
-      <div class="upload-section">
-        <label for="imageUpload" class="upload-label">📁 Upload Custom Avatar</label>
-        <input type="file" id="imageUpload" accept="image/*" />
-        <span id="uploadStatus"></span>
+      <div class="input-group">
+        <label>Select Avatar:</label>
+        <div class="avatar-selector">
+          <button class="avatar-btn active" data-avatar="🚀">🚀</button>
+          <button class="avatar-btn" data-avatar="🛸">🛸</button>
+          <button class="avatar-btn" data-avatar="👾">👾</button>
+          <button class="avatar-btn" data-avatar="👻">👻</button>
+        </div>
       </div>
 
-      <div class="name-input-group">
-        <input 
-          type="text" 
-          id="playerName" 
-          placeholder="ACE" 
-          maxlength="3" 
-          autocomplete="off"
-          style="text-transform: uppercase;"
-        />
-        <small class="input-hint">Enter 1 to 3 letters</small>
+      <div class="input-group">
+        <label for="custom-avatar-input">Or Upload Custom Avatar (Image):</label>
+        <input type="file" id="custom-avatar-input" accept="image/*">
       </div>
 
-      <button id="startBtn" class="primary-btn">Tap / Click to Play</button>
+      <button id="start-btn" class="btn">START GAME</button>
     </div>
 
-    <!-- UI Overlay: Game Over & Live Leaderboard -->
-    <div id="game-over" class="overlay hidden">
+    <!-- Game Over Screen & Leaderboard -->
+    <div id="game-over-screen" class="overlay hidden">
       <h2>GAME OVER</h2>
-      <div class="score-summary">
-        <p>Score: <span id="finalScore">0</span></p>
-        <p>Best: <span id="bestScore">0</span></p>
+      <p id="final-score">Score: 0</p>
+
+      <div id="leaderboard-box">
+        <h3>Top High Scores</h3>
+        <ol id="leaderboard-list">
+          <li class="loading">Loading scores...</li>
+        </ol>
       </div>
 
-      <div class="leaderboard-box">
-        <h3>🏆 Top 15 High Scores</h3>
-        <ul id="leaderboardList">
-          <li>Loading scores...</li>
-        </ul>
-      </div>
-
-      <div class="button-group">
-        <button id="retryBtn" class="primary-btn">Play Again</button>
-        <button id="changeCharBtn" class="secondary-btn">Change Character</button>
-      </div>
+      <button id="restart-btn" class="btn">PLAY AGAIN</button>
     </div>
   </div>
 
