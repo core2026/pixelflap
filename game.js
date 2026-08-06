@@ -1,16 +1,16 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.1.05
+ * Version: v2.2.00
  *
- * WHAT CHANGED IN v2.1.05
- * - Updated formatServerDate to handle ISO 8601 strings, SQLite space-separated
- *   timestamps, and missing properties across all browser vendors.
+ * WHAT CHANGED IN v2.2.00
+ * - Added pure JS 8-bit retro background music synth loop using Web Audio API.
+ * - Dynamic music tempo that slows down during Turtle Time!
  * =============================================================================
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.1.05";
+  const GAME_VERSION = "v2.2.00";
 
   // ===========================================================================
   // 0. CONFIG
@@ -93,13 +93,68 @@ window.addEventListener('DOMContentLoaded', () => {
   clouds.forEach(c => { c.x = c.fx * VW; c.y = c.fy * VH; });
 
   // ===========================================================================
-  // 3. AUDIO SYNTHESIZER
+  // 3. AUDIO SYNTHESIZER & RETRO BGM
   // ===========================================================================
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   let audioCtx = null;
 
+  let bgmInterval = null;
+  let bgmNoteIndex = 0;
+
+  // Old-school 8-bit arcade melody line (frequencies in Hz)
+  const RETRO_MELODY = [
+    261.63, 329.63, 392.00, 523.25, 392.00, 329.63,
+    293.66, 349.23, 440.00, 587.33, 440.00, 349.23,
+    329.63, 392.00, 493.88, 659.25, 493.88, 392.00,
+    349.23, 440.00, 523.25, 698.46, 523.25, 440.00
+  ];
+
   function initAudio() {
     if (!audioCtx) audioCtx = new AudioCtx();
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  }
+
+  function startBackgroundMusic() {
+    if (bgmInterval || audioMuted || !audioCtx) return;
+
+    bgmNoteIndex = 0;
+    bgmInterval = setInterval(() => {
+      if (audioMuted || !gameStarted || gameOver) {
+        stopBackgroundMusic();
+        return;
+      }
+
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        // Square wave creates the iconic NES / GameBoy sound
+        osc.type = 'square';
+        const freq = RETRO_MELODY[bgmNoteIndex % RETRO_MELODY.length];
+
+        const noteDuration = slowMoTimer > 0 ? 0.25 : 0.14;
+
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.04, audioCtx.currentTime); // Soft background volume
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + noteDuration);
+
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + noteDuration);
+
+        bgmNoteIndex++;
+      } catch (e) { }
+    }, 180);
+  }
+
+  function stopBackgroundMusic() {
+    if (bgmInterval) {
+      clearInterval(bgmInterval);
+      bgmInterval = null;
+    }
   }
 
   function playSound(type) {
@@ -206,7 +261,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // ===========================================================================
   function formatServerDate(rawDate) {
     if (!rawDate || rawDate === "undefined" || rawDate === "null") return "--";
-    
+
     try {
       let str = String(rawDate).trim();
       if (str.includes(" ") && !str.includes("T")) {
@@ -263,7 +318,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const res = await fetch(`${CONFIG.API_BASE_URL}/api/leaderboard`);
       if (!res.ok) throw new Error('Bad response');
       const data = await res.json();
-      
+
       highScores = data.map(r => {
         let rawDate = r.created_at || r.createdAt || r.date || r.timestamp || r.created;
         return {
@@ -414,6 +469,7 @@ window.addEventListener('DOMContentLoaded', () => {
     gameStarted = true;
     showScreen('game');
     resetGame();
+    startBackgroundMusic();
   });
 
   howToPlayBtn.addEventListener('click', () => infoModal.classList.remove('hidden'));
@@ -423,11 +479,17 @@ window.addEventListener('DOMContentLoaded', () => {
   muteBtn.addEventListener('click', () => {
     audioMuted = !audioMuted;
     muteBtn.textContent = audioMuted ? '🔇 Audio: Off' : '🔊 Audio: On';
+    if (audioMuted) {
+      stopBackgroundMusic();
+    } else if (gameStarted && !gameOver) {
+      startBackgroundMusic();
+    }
   });
 
   customAvatarBtn.addEventListener('click', () => avatarFileInput.click());
 
   homeBtn.addEventListener('click', () => {
+    stopBackgroundMusic();
     gameStarted = false;
     gameOver = false;
     showScreen('splash');
@@ -437,6 +499,7 @@ window.addEventListener('DOMContentLoaded', () => {
     resetGame();
     gameStarted = true;
     showScreen('game');
+    startBackgroundMusic();
   });
 
   window.addEventListener('keydown', (e) => {
@@ -796,6 +859,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // ===========================================================================
   async function endGame() {
     if (!gameOver) {
+      stopBackgroundMusic();
       playSound('hit');
       gameOver = true;
       finalScoreEl.textContent = `Score (${playerInitials || "---"}): ${score} pts`;
