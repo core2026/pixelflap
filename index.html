@@ -2,120 +2,57 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  
-  <!-- Cache Control Meta Tags -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-
-  <title>PixelJump</title>
-  <link rel="stylesheet" href="style.css?v=1.3">
+  <title>PixelJump - v1.3.0</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #121212;
+      color: #ffffff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    #game-container {
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      background-color: #70c5ce;
+    }
+    .instructions {
+      margin-top: 12px;
+      font-size: 14px;
+      color: #aaa;
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
 
   <div id="game-container">
-    <!-- Start Screen Overlay -->
-    <div id="start-screen" class="overlay">
-      <h1 class="title">PIXELJUMP</h1>
-
-      <div class="input-group">
-        <label for="player-initials">Player Initials (1-3 Letters)</label>
-        <input type="text" id="player-initials" maxlength="3" value="" placeholder="AAA" autocomplete="off">
-      </div>
-
-      <div class="input-group">
-        <label>Choose Avatar</label>
-        <div class="avatar-selector">
-          <button class="avatar-btn active" data-avatar="🚀"><span>🚀</span></button>
-          <button class="avatar-btn" data-avatar="👾"><span>👾</span></button>
-          <button class="avatar-btn" data-avatar="🛸"><span>🛸</span></button>
-          <button class="avatar-btn" data-avatar="🤖"><span>🤖</span></button>
-          <button class="avatar-btn" data-avatar="🐱‍🚀"><span>🐱‍🚀</span></button>
-        </div>
-      </div>
-
-      <div class="input-group">
-        <label for="custom-avatar-input">Or Upload Custom Photo</label>
-        <input type="file" id="custom-avatar-input" accept="image/*">
-      </div>
-
-      <button id="info-btn" class="btn secondary-btn">📖 HOW TO PLAY / INFO</button>
-      <button id="start-btn" class="btn">LAUNCH GAME</button>
-    </div>
-
-    <!-- Power-Ups & Hazards Info Modal -->
-    <div id="info-modal" class="overlay hidden">
-      <h2 class="modal-title">POWER-UPS & HAZARDS</h2>
-
-      <div class="info-grid">
-        <div class="info-item">
-          <span class="icon">🛡️</span>
-          <div>
-            <strong>Stacking Shield</strong>
-            <small>Start with 1 shield! Collect to stack up to 3x.</small>
-          </div>
-        </div>
-        <div class="info-item">
-          <span class="icon">🗡️</span>
-          <div>
-            <strong>Spinning Sword</strong>
-            <small>Orbits player for 8s & slices through pipes!</small>
-          </div>
-        </div>
-        <div class="info-item">
-          <span class="icon">⏱️</span>
-          <div>
-            <strong>Slow-Mo</strong>
-            <small>Reduces game speed by 45%</small>
-          </div>
-        </div>
-        <div class="info-item">
-          <span class="icon">⚡</span>
-          <div>
-            <strong>2X Score</strong>
-            <small>Doubles pipe & star points</small>
-          </div>
-        </div>
-        <div class="info-item">
-          <span class="icon">⭐</span>
-          <div>
-            <strong>Star</strong>
-            <small>+5 bonus score pts</small>
-          </div>
-        </div>
-        <div class="info-item">
-          <span class="icon">🌌</span>
-          <div>
-            <strong>Dynamic Realms</strong>
-            <small>Theme colors shift as score increases!</small>
-          </div>
-        </div>
-      </div>
-
-      <button id="close-info-btn" class="btn">CLOSE</button>
-    </div>
-
-    <!-- Game Over Screen Overlay -->
-    <div id="game-over-screen" class="overlay hidden">
-      <h1 class="title" style="color: #ff1744;">GAME OVER</h1>
-      <p id="final-score">Final Score: 0</p>
-
-      <div id="leaderboard-box">
-        <h3>Top Astronauts</h3>
-        <ul id="leaderboard-list">
-          <li class="loading">Loading scores...</li>
-        </ul>
-      </div>
-
-      <button id="restart-btn" class="btn">PLAY AGAIN</button>
-      <button id="change-char-btn" class="btn secondary-btn">🚀 CHANGE AVATAR / INITIALS</button>
-    </div>
-
-    <!-- Main Canvas -->
-    <canvas id="gameCanvas"></canvas>
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
   </div>
 
-  <script src="game.js?v=1.3"></script>
+  <div class="instructions">
+    <p>Collect 🛡️ <strong>Shield</strong> + ⚔️ <strong>Sword</strong> to unleash the <strong>Medieval Knight</strong>!</p>
+  </div>
+
+  <!-- Asset version bumped to v1.3.0 to bypass old browser & Cloudflare caches -->
+  <script src="game.js?v=1.3.0"></script>
 </body>
 </html>

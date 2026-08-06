@@ -1,115 +1,209 @@
+/**
+ * PixelJump Game Engine
+ * Version: 1.3.0 (Medieval Knight Combo Update)
+ */
+
 // ==========================================
-// 1. GAME STATE & POWER-UP CONFIGURATION
+// 1. CONSTANTS & INITIALIZATION
 // ==========================================
+const GAME_VERSION = "v1.3.0";
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 let score = 0;
+let gameOver = false;
+let frameCount = 0;
 
-// Player state
+// Isolated Character Selection System (Prevents Cat & Rocket sprite overwriting)
+const CHARACTERS = {
+  cat: {
+    id: 'cat',
+    name: 'Cat',
+    color: '#ff9800',
+    imageSrc: 'assets/cat.png',
+    sprite: new Image()
+  },
+  rocket: {
+    id: 'rocket',
+    name: 'Rocket',
+    color: '#e91e63',
+    imageSrc: 'assets/rocket.png',
+    sprite: new Image()
+  }
+};
+
+// Preload sprites independently
+Object.keys(CHARACTERS).forEach(key => {
+  CHARACTERS[key].sprite.src = CHARACTERS[key].imageSrc;
+});
+
+// Selected Player State
+let currentCharacter = CHARACTERS.cat;
+
 const player = {
-  x: 100,
+  x: 80,
   y: 250,
   width: 32,
   height: 32,
+  vy: 0,
+  gravity: 0.35,
+  jumpStrength: -7,
   inventory: { shield: false, sword: false }
 };
 
-// Medieval Knight Power-Up State
+// Medieval Knight Combo State
 const knightPowerup = {
   active: false,
   pipesRemaining: 0,
-  xOffset: 40, // Sits slightly ahead of player
-  yOffset: 0,
-  animFrame: 0,
+  xOffset: 45,
   slashTimer: 0
 };
 
-// Game Entities
+// Game Entities Arrays
 let pipes = [];
+let items = [];
 let particles = [];
 let floatingTexts = [];
 
 // ==========================================
-// 2. COMBO & POWER-UP SYSTEM
+// 2. INPUT & EVENT LISTENERS
 // ==========================================
+function jump() {
+  if (gameOver) {
+    resetGame();
+    return;
+  }
+  player.vy = player.jumpStrength;
+}
 
-/**
- * Call this whenever player collides with a power-up item
- */
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.code === 'ArrowUp') {
+    jump();
+  }
+});
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  jump();
+});
+
+// ==========================================
+// 3. COMBO & ITEM LOGIC
+// ==========================================
+function spawnItem(pipeX) {
+  // 30% chance to spawn shield or sword when pipes spawn
+  if (Math.random() < 0.3) {
+    const type = Math.random() > 0.5 ? 'shield' : 'sword';
+    items.push({
+      type: type,
+      x: pipeX + 20,
+      y: 200 + Math.random() * 150,
+      size: 20,
+      collected: false
+    });
+  }
+}
+
 function collectItem(type) {
   if (type === 'shield') player.inventory.shield = true;
   if (type === 'sword') player.inventory.sword = true;
 
-  // Check for combo activation
+  spawnFloatingText(`Picked up ${type.toUpperCase()}!`, player.x, player.y - 15, "#00e676");
+
+  // Trigger Medieval Knight Combo if player holds both
   if (player.inventory.shield && player.inventory.sword) {
     triggerKnightCombo();
   }
 }
 
-/**
- * Triggers the Royal Rampage mode
- */
 function triggerKnightCombo() {
-  // Reset inventory items
+  // Consume items
   player.inventory.shield = false;
   player.inventory.sword = false;
 
-  // Activate Knight
+  // Activate Knight state
   knightPowerup.active = true;
   knightPowerup.pipesRemaining = 6;
   knightPowerup.slashTimer = 0;
 
-  // Bonus Points & Visual Text
+  // Award bonus points & popup
   score += 50;
-  spawnFloatingText("+50 ROYAL RAMPAGE!", player.x, player.y - 20, "#ffd700");
+  spawnFloatingText("+50 ROYAL RAMPAGE!", player.x, player.y - 30, "#ffd700");
 }
 
 // ==========================================
-// 3. VISUAL EFFECTS (PARTICLES & FLOATING TEXT)
+// 4. PARTICLES & VISUAL POPUPS
 // ==========================================
-
-/**
- * Spawns particle debris when a pipe shatters
- */
 function createPipeShatterParticles(x, y, width, height) {
-  const particleCount = 24;
+  const particleCount = 20;
   for (let i = 0; i < particleCount; i++) {
     particles.push({
       x: x + Math.random() * width,
       y: y + Math.random() * height,
-      vx: (Math.random() - 0.2) * 8 + 2,  // Forward burst momentum
-      vy: (Math.random() - 0.5) * 8,      // Vertical explosion spread
+      vx: (Math.random() - 0.1) * 7 + 2,
+      vy: (Math.random() - 0.5) * 8,
       size: Math.random() * 6 + 4,
-      color: Math.random() > 0.5 ? '#2e7d32' : '#4caf50', // Pipe green shades
+      color: Math.random() > 0.5 ? '#2e7d32' : '#4caf50',
       alpha: 1.0,
-      gravity: 0.35,
+      gravity: 0.3,
       rotation: Math.random() * Math.PI * 2,
       vRot: (Math.random() - 0.5) * 0.2
     });
   }
 }
 
-/**
- * Floating bonus score text popup
- */
 function spawnFloatingText(text, x, y, color = '#ffffff') {
   floatingTexts.push({
     text: text,
     x: x,
     y: y,
     alpha: 1.0,
-    vy: -1.5,
+    vy: -1.2,
     color: color
   });
 }
 
 // ==========================================
-// 4. COLLISION & LOGIC UPDATES
+// 5. GAME LOGIC & COLLISIONS
 // ==========================================
+function spawnPipe() {
+  const gap = 140;
+  const minHeight = 50;
+  const maxHeight = canvas.height - gap - minHeight;
+  const topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
 
-function updateGameLogic() {
-  // A. Update Floating Text Popups
+  pipes.push({
+    x: canvas.width,
+    width: 50,
+    topHeight: topHeight,
+    bottomY: topHeight + gap,
+    passed: false,
+    shattered: false
+  });
+
+  spawnItem(canvas.width);
+}
+
+function update() {
+  if (gameOver) return;
+
+  frameCount++;
+
+  // Apply Player Physics
+  player.vy += player.gravity;
+  player.y += player.vy;
+
+  // Floor / Ceiling Boundaries
+  if (player.y + player.height >= canvas.height || player.y <= 0) {
+    endGame();
+  }
+
+  // Spawn Pipes every 120 frames
+  if (frameCount % 120 === 0) {
+    spawnPipe();
+  }
+
+  // Update Floating Texts
   for (let i = floatingTexts.length - 1; i >= 0; i--) {
     const ft = floatingTexts[i];
     ft.y += ft.vy;
@@ -117,7 +211,7 @@ function updateGameLogic() {
     if (ft.alpha <= 0) floatingTexts.splice(i, 1);
   }
 
-  // B. Update Pipe Shatter Particles
+  // Update Particles
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.x += p.vx;
@@ -128,66 +222,100 @@ function updateGameLogic() {
     if (p.alpha <= 0) particles.splice(i, 1);
   }
 
-  // C. Update Pipe Collisions & Knight Slicing
+  // Update Collectible Items
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i];
+    item.x -= 2;
+
+    // Item Pickup Detection
+    if (!item.collected && 
+        player.x < item.x + item.size &&
+        player.x + player.width > item.x &&
+        player.y < item.y + item.size &&
+        player.y + player.height > item.y) {
+      item.collected = true;
+      collectItem(item.type);
+      items.splice(i, 1);
+    } else if (item.x + item.size < 0) {
+      items.splice(i, 1);
+    }
+  }
+
+  // Update Pipes & Collision Checks
   const knightX = player.x + knightPowerup.xOffset;
 
-  pipes.forEach(pipe => {
-    if (pipe.shattered) return;
+  for (let i = pipes.length - 1; i >= 0; i--) {
+    const pipe = pipes[i];
+    pipe.x -= 2;
 
+    // Pass Pipe Scoring
+    if (!pipe.passed && pipe.x + pipe.width < player.x) {
+      pipe.passed = true;
+      score++;
+    }
+
+    if (pipe.shattered) continue;
+
+    // Knight Destroy Logic
     if (knightPowerup.active) {
-      // Check if pipe reaches Knight's weapon range
-      if (pipe.x <= knightX + 40 && pipe.x + pipe.width >= knightX) {
-        // Shatter pipe pair (top & bottom)
+      if (pipe.x <= knightX + 45 && pipe.x + pipe.width >= knightX) {
         pipe.shattered = true;
         knightPowerup.pipesRemaining--;
-        knightPowerup.slashTimer = 10; // Trigger slash anim frame duration
+        knightPowerup.slashTimer = 12;
 
-        // Spawn shattering particle effect
+        // Shatter Effect & Text
         createPipeShatterParticles(pipe.x, 0, pipe.width, pipe.topHeight);
         createPipeShatterParticles(pipe.x, pipe.bottomY, pipe.width, canvas.height - pipe.bottomY);
         spawnFloatingText("SLASH!", pipe.x, player.y, "#ff5252");
 
-        // Deactivate Knight once 6 pipes destroyed
         if (knightPowerup.pipesRemaining <= 0) {
           knightPowerup.active = false;
         }
       }
     } else {
-      // Normal collision handling when knight is inactive
-      if (checkStandardCollision(player, pipe)) {
-        console.log("Game Over!");
+      // Standard Box Collision Check
+      const hitBox = (
+        player.x + player.width > pipe.x &&
+        player.x < pipe.x + pipe.width &&
+        (player.y < pipe.topHeight || player.y + player.height > pipe.bottomY)
+      );
+
+      if (hitBox) {
+        endGame();
       }
     }
-  });
-}
 
-function checkStandardCollision(player, pipe) {
-  // Standard bounding box collision check
-  const inX = player.x + player.width > pipe.x && player.x < pipe.x + pipe.width;
-  const hitTop = player.y < pipe.topHeight;
-  const hitBottom = player.y + player.height > pipe.bottomY;
-  return inX && (hitTop || hitBottom);
+    // Cleanup off-screen pipes
+    if (pipe.x + pipe.width < 0) {
+      pipes.splice(i, 1);
+    }
+  }
 }
 
 // ==========================================
-// 5. RENDERING PIPELINES
+// 6. RENDERING PIPELINE
 // ==========================================
-
 function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Clear Frame
+  ctx.fillStyle = "#70c5ce";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // 1. Draw Pipes
   pipes.forEach(pipe => {
-    if (pipe.shattered) return; // Don't render broken pipes
-
+    if (pipe.shattered) return;
     ctx.fillStyle = "#388e3c";
-    // Top Pipe
     ctx.fillRect(pipe.x, 0, pipe.width, pipe.topHeight);
-    // Bottom Pipe
     ctx.fillRect(pipe.x, pipe.bottomY, pipe.width, canvas.height - pipe.bottomY);
   });
 
-  // 2. Draw Shatter Particles
+  // 2. Draw Items
+  items.forEach(item => {
+    ctx.font = "20px sans-serif";
+    const icon = item.type === 'shield' ? '🛡️' : '⚔️';
+    ctx.fillText(icon, item.x, item.y);
+  });
+
+  // 3. Draw Shatter Particles
   particles.forEach(p => {
     ctx.save();
     ctx.globalAlpha = Math.max(0, p.alpha);
@@ -198,67 +326,128 @@ function draw() {
     ctx.restore();
   });
 
-  // 3. Draw Player
-  ctx.fillStyle = "#2196f3";
-  ctx.fillRect(player.x, player.y, player.width, player.height);
+  // 4. Draw Player Character
+  if (currentCharacter.sprite.complete && currentCharacter.sprite.naturalWidth !== 0) {
+    ctx.drawImage(currentCharacter.sprite, player.x, player.y, player.width, player.height);
+  } else {
+    // Fallback block if sprite asset is loading
+    ctx.fillStyle = currentCharacter.color;
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+  }
 
-  // 4. Draw Knight (If active)
+  // 5. Draw Knight Avatar (If active)
   if (knightPowerup.active) {
     drawKnight(player.x + knightPowerup.xOffset, player.y);
   }
 
-  // 5. Draw Floating Text Popups
+  // 6. Draw Floating Score Text
   floatingTexts.forEach(ft => {
     ctx.save();
     ctx.globalAlpha = Math.max(0, ft.alpha);
-    ctx.font = "bold 16px sans-serif";
+    ctx.font = "bold 15px sans-serif";
     ctx.fillStyle = ft.color;
     ctx.fillText(ft.text, ft.x, ft.y);
     ctx.restore();
   });
 
-  // 6. HUD / Knight Counter Status
+  // 7. HUD & Inventory Overlay
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 18px sans-serif";
+  ctx.fillText(`Score: ${score}`, 15, 30);
+
+  // Version Display
+  ctx.font = "12px sans-serif";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+  ctx.fillText(GAME_VERSION, canvas.width - 55, 20);
+
+  // Inventory Status
+  let invStatus = "Items: ";
+  if (player.inventory.shield) invStatus += "🛡️ ";
+  if (player.inventory.sword) invStatus += "⚔️ ";
+  ctx.font = "14px sans-serif";
+  ctx.fillText(invStatus, 15, 55);
+
+  // Knight Rampage Counter Status
   if (knightPowerup.active) {
-    ctx.font = "bold 14px sans-serif";
     ctx.fillStyle = "#ffd700";
-    ctx.fillText(`Knight Pipes Remaining: ${knightPowerup.pipesRemaining}`, 10, 30);
+    ctx.font = "bold 14px sans-serif";
+    ctx.fillText(`Knight Destruction Left: ${knightPowerup.pipesRemaining}`, 15, 80);
+  }
+
+  // Game Over Screen
+  if (gameOver) {
+    ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 28px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 10);
+    ctx.font = "16px sans-serif";
+    ctx.fillText("Tap or Press Space to Restart", canvas.width / 2, canvas.height / 2 + 25);
+    ctx.textAlign = "left";
   }
 }
 
-/**
- * Draws Knight Avatar & Slash Visual FX
- * (Replace rect shapes with custom Knight sprite sheet when available)
- */
 function drawKnight(x, y) {
   ctx.save();
 
-  // Knight Body / Armor
+  // Armor Body
   ctx.fillStyle = "#b0bec5";
-  ctx.fillRect(x, y - 5, 28, 38);
+  ctx.fillRect(x, y - 5, 26, 36);
 
   // Red Cape
   ctx.fillStyle = "#d32f2f";
-  ctx.fillRect(x - 8, y - 2, 8, 30);
+  ctx.fillRect(x - 8, y - 2, 8, 28);
 
-  // Helmet Visor
+  // Visor
   ctx.fillStyle = "#263238";
   ctx.fillRect(x + 14, y, 10, 6);
 
-  // Sword & Slash Arc
+  // Sword Swing
   if (knightPowerup.slashTimer > 0) {
     knightPowerup.slashTimer--;
-
-    // Animated Slash Arc
     ctx.beginPath();
     ctx.arc(x + 30, y + 15, 35, -Math.PI / 3, Math.PI / 3, false);
     ctx.lineWidth = 4;
     ctx.strokeStyle = "#e0f7fa";
     ctx.stroke();
   } else {
-    // Resting Sword position
+    // Upright Sword
     ctx.fillStyle = "#cfd8dc";
-    ctx.fillRect(x + 24, y - 15, 4, 30);
+    ctx.fillRect(x + 22, y - 15, 4, 30);
   }
 
   ctx.restore();
 }
+
+function endGame() {
+  gameOver = true;
+}
+
+function resetGame() {
+  player.y = 250;
+  player.vy = 0;
+  player.inventory.shield = false;
+  player.inventory.sword = false;
+  knightPowerup.active = false;
+  knightPowerup.pipesRemaining = 0;
+  score = 0;
+  pipes = [];
+  items = [];
+  particles = [];
+  floatingTexts = [];
+  frameCount = 0;
+  gameOver = false;
+}
+
+// ==========================================
+// 7. MAIN GAME LOOP
+// ==========================================
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+// Start Game Engine
+gameLoop();
