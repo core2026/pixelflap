@@ -72,7 +72,7 @@ canvas {
 }
 
 #info-modal {
-  z-index: 20; /* High z-index to sit on top of start & game-over screens */
+  z-index: 20;
 }
 
 .hidden {

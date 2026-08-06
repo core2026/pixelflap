@@ -5,7 +5,7 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const container = document.getElementById("game-container");
 
-// Dynamic Resolution Scaler for iPad / Desktop Container
+// Dynamic Resolution Scaler
 function resizeCanvas() {
   canvas.width = container.clientWidth;
   canvas.height = container.clientHeight;
@@ -14,7 +14,6 @@ function resizeCanvas() {
 window.addEventListener("resize", resizeCanvas);
 window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 200));
 
-// Initial sizing checks for iOS Safari render delays
 resizeCanvas();
 setTimeout(resizeCanvas, 100);
 
@@ -45,7 +44,7 @@ let currentTheme = themes[0];
 let gameState = "MENU"; // MENU, PLAYING, GAMEOVER
 let score = 0;
 let frames = 0;
-let playerInitials = "ACE";
+let playerInitials = "";
 let selectedAvatar = "🚀";
 let customImageObj = null;
 
@@ -68,12 +67,12 @@ const activePowerUps = {
 
 // Game Objects
 let pipes = [];
-let stars = [];         // Bonus star collectibles (+5 pts)
-let powerUpItems = [];  // Floating power-ups (Shield, SlowMo, 2X)
-let comets = [];        // Flying hazards
-let debris = [];        // Space dust / stars
-let particles = [];     // Jump trail particles
-let popups = [];        // Floating text popups (+1, +5, etc.)
+let stars = [];
+let powerUpItems = [];
+let comets = [];
+let debris = [];
+let particles = [];
+let popups = [];
 
 // --- WEB AUDIO API & RETRO SYNTH BGM ---
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -149,7 +148,6 @@ function playSound(type) {
   }
 }
 
-// Procedural Synth-wave Bassline BGM
 function startBGM() {
   stopBGM();
   bgmStep = 0;
@@ -192,7 +190,7 @@ closeInfoBtn.addEventListener("click", () => {
   infoModal.classList.add("hidden");
 });
 
-// Initialize Controls & Avatars
+// Controls & Avatars
 avatarBtns.forEach(btn => {
   btn.addEventListener("click", () => {
     avatarBtns.forEach(b => b.classList.remove("active"));
@@ -218,7 +216,6 @@ customAvatarInput.addEventListener("change", (e) => {
   }
 });
 
-// Clear red highlight on input focus
 initialsInput.addEventListener("input", () => {
   initialsInput.classList.remove("invalid");
 });
@@ -230,7 +227,6 @@ function jump() {
     player.velocity = player.jump;
     playSound("jump");
 
-    // Spawn jump trail particles
     for (let i = 0; i < 6; i++) {
       particles.push({
         x: player.x + 10,
@@ -245,13 +241,7 @@ function jump() {
 }
 
 function addPopupText(txt, x, y, color = "#00e5ff") {
-  popups.push({
-    text: txt,
-    x: x,
-    y: y,
-    alpha: 1.0,
-    color: color
-  });
+  popups.push({ text: txt, x: x, y: y, alpha: 1.0, color: color });
 }
 
 window.addEventListener("keydown", (e) => {
@@ -269,7 +259,6 @@ canvas.addEventListener("mousedown", jump);
 startBtn.addEventListener("click", () => {
   initAudio();
   
-  // Validate 1-3 letters for initials
   const inputVal = initialsInput.value.trim().toUpperCase();
   if (!inputVal || inputVal.length < 1 || inputVal.length > 3) {
     initialsInput.classList.add("invalid");
@@ -288,10 +277,14 @@ restartBtn.addEventListener("click", () => {
   startGame();
 });
 
+// Explicit return to Start Menu
 changeCharBtn.addEventListener("click", () => {
-  gameOverScreen.classList.add("hidden");
-  startScreen.classList.remove("hidden");
+  stopBGM();
   gameState = "MENU";
+  gameOverScreen.classList.add("hidden");
+  infoModal.classList.add("hidden");
+  startScreen.classList.remove("hidden");
+  initialsInput.focus();
 });
 
 function startGame() {
@@ -312,7 +305,6 @@ function startGame() {
   score = 0;
   frames = 0;
 
-  // Initialize space debris
   debris = [];
   for (let i = 0; i < 22; i++) {
     debris.push({
@@ -329,7 +321,6 @@ function startGame() {
   startBGM();
 }
 
-// Main Game Loop
 function loop() {
   update();
   render();
@@ -341,7 +332,6 @@ function update() {
 
   frames++;
 
-  // Slow-Mo modifier
   const isSlowMo = activePowerUps.slowMoTimer > 0;
   if (isSlowMo) activePowerUps.slowMoTimer--;
   if (activePowerUps.doubleScoreTimer > 0) activePowerUps.doubleScoreTimer--;
@@ -352,7 +342,6 @@ function update() {
   player.velocity += player.gravity * (isSlowMo ? 0.75 : 1.0);
   player.y += player.velocity;
 
-  // Floor / Ceiling collisions
   if (player.y + player.size >= canvas.height || player.y <= 0) {
     if (player.hasShield) {
       player.hasShield = false;
@@ -365,14 +354,12 @@ function update() {
     }
   }
 
-  // Hyperspace Speed Acceleration based on score
   const warpBonus = Math.min(score * 0.1, 4.0);
   debris.forEach(d => {
     d.x -= (d.baseSpeed + warpBonus) * speedMult;
     if (d.x < 0) d.x = canvas.width;
   });
 
-  // Spawn Obstacles (Pipes)
   const spawnRate = isSlowMo ? 120 : 90;
   if (frames % spawnRate === 0) {
     const gap = 145;
@@ -390,28 +377,16 @@ function update() {
       dir: 1
     });
 
-    // Spawn bonus collectibles / power-ups
     const rand = Math.random();
     if (rand < 0.35) {
-      stars.push({
-        x: canvas.width + 25,
-        y: topHeight + gap / 2,
-        size: 14,
-        collected: false
-      });
+      stars.push({ x: canvas.width + 25, y: topHeight + gap / 2, size: 14, collected: false });
     } else if (rand > 0.75) {
       const types = ["shield", "slowMo", "2x"];
       const pType = types[Math.floor(Math.random() * types.length)];
-      powerUpItems.push({
-        x: canvas.width + 25,
-        y: topHeight + gap / 2,
-        type: pType,
-        collected: false
-      });
+      powerUpItems.push({ x: canvas.width + 25, y: topHeight + gap / 2, type: pType, collected: false });
     }
   }
 
-  // Spawn Comets (Score >= 8)
   if (score >= 8 && frames % 260 === 0 && Math.random() < 0.6) {
     comets.push({
       x: canvas.width + 30,
@@ -422,7 +397,6 @@ function update() {
     });
   }
 
-  // Update Pipes & Check Collisions
   pipes.forEach(p => {
     p.x -= gameSpeed;
 
@@ -434,7 +408,6 @@ function update() {
     const currentTop = p.top + (p.isMoving ? p.offset : 0);
     const currentBottom = p.bottom - (p.isMoving ? p.offset : 0);
 
-    // Collision Check
     if (
       player.x < p.x + 45 &&
       player.x + player.size > p.x &&
@@ -451,7 +424,6 @@ function update() {
       }
     }
 
-    // Score Check
     if (p.x + 45 < player.x && !p.passed) {
       const pts = activePowerUps.doubleScoreTimer > 0 ? 2 : 1;
       score += pts;
@@ -462,7 +434,6 @@ function update() {
   });
   pipes = pipes.filter(p => p.x > -50);
 
-  // Update Comets
   comets.forEach(c => {
     c.x += c.vx;
     c.y += c.vy;
@@ -483,7 +454,6 @@ function update() {
   });
   comets = comets.filter(c => c.x > -40);
 
-  // Update Star Collectibles
   const playerCenterX = player.x + player.size / 2;
   const playerCenterY = player.y + player.size / 2;
 
@@ -500,7 +470,6 @@ function update() {
   });
   stars = stars.filter(s => s.x > -20 && !s.collected);
 
-  // Update Power-Up Items
   powerUpItems.forEach(pu => {
     pu.x -= gameSpeed;
     if (!pu.collected && Math.hypot(playerCenterX - pu.x, playerCenterY - pu.y) < player.size / 2 + 16) {
@@ -522,7 +491,6 @@ function update() {
   });
   powerUpItems = powerUpItems.filter(pu => pu.x > -30 && !pu.collected);
 
-  // Update Particle Trail
   particles.forEach(pt => {
     pt.x += pt.vx;
     pt.y += pt.vy;
@@ -530,7 +498,6 @@ function update() {
   });
   particles = particles.filter(pt => pt.life > 0);
 
-  // Update Floating Popups
   popups.forEach(pop => {
     pop.y -= 1.2;
     pop.alpha -= 0.02;
@@ -542,7 +509,6 @@ function render() {
   ctx.fillStyle = currentTheme.bg;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Render Space Debris
   ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
   debris.forEach(d => {
     ctx.beginPath();
@@ -550,7 +516,6 @@ function render() {
     ctx.fill();
   });
 
-  // Render Jump Particles
   particles.forEach(pt => {
     ctx.fillStyle = pt.color;
     ctx.beginPath();
@@ -558,7 +523,6 @@ function render() {
     ctx.fill();
   });
 
-  // Render Pipes
   pipes.forEach(p => {
     const currentTop = p.top + (p.isMoving ? p.offset : 0);
     const currentBottom = p.bottom - (p.isMoving ? p.offset : 0);
@@ -567,16 +531,13 @@ function render() {
     ctx.strokeStyle = currentTheme.pipeBorder;
     ctx.lineWidth = 3;
 
-    // Top Pipe
     ctx.fillRect(p.x, 0, 45, currentTop);
     ctx.strokeRect(p.x, 0, 45, currentTop);
 
-    // Bottom Pipe
     ctx.fillRect(p.x, canvas.height - currentBottom, 45, currentBottom);
     ctx.strokeRect(p.x, canvas.height - currentBottom, 45, currentBottom);
   });
 
-  // Render Comets
   comets.forEach(c => {
     ctx.save();
     ctx.fillStyle = "#ff3d00";
@@ -588,7 +549,6 @@ function render() {
     ctx.restore();
   });
 
-  // Render Stars
   stars.forEach(s => {
     ctx.save();
     ctx.fillStyle = "#ffd700";
@@ -600,7 +560,6 @@ function render() {
     ctx.restore();
   });
 
-  // Render Power-Up Items
   powerUpItems.forEach(pu => {
     ctx.save();
     ctx.font = "20px sans-serif";
@@ -611,7 +570,6 @@ function render() {
     ctx.restore();
   });
 
-  // Render Player Avatar
   const centerX = player.x + player.size / 2;
   const centerY = player.y + player.size / 2;
   const radius = player.size / 2;
@@ -639,7 +597,6 @@ function render() {
     ctx.fillText(selectedAvatar, centerX, centerY);
   }
 
-  // Render Shield Bubble around player
   if (player.hasShield) {
     ctx.save();
     ctx.strokeStyle = "#00e5ff";
@@ -652,7 +609,6 @@ function render() {
     ctx.restore();
   }
 
-  // Render Floating Popups
   popups.forEach(pop => {
     ctx.save();
     ctx.fillStyle = pop.color;
@@ -662,7 +618,6 @@ function render() {
     ctx.restore();
   });
 
-  // Render Active Power-Up Status Indicators
   let hudOffset = 70;
   if (activePowerUps.slowMoTimer > 0) {
     ctx.fillStyle = "#d500f9";
@@ -676,7 +631,6 @@ function render() {
     ctx.fillText(`⚡ 2X SCORE: ${(activePowerUps.doubleScoreTimer / 60).toFixed(1)}s`, 10, hudOffset);
   }
 
-  // Render Live Score Counter
   if (gameState === "PLAYING") {
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 26px 'Segoe UI', sans-serif";
@@ -685,7 +639,6 @@ function render() {
   }
 }
 
-// Game Over & Leaderboard Handling
 function triggerGameOver() {
   gameState = "GAMEOVER";
   stopBGM();
@@ -747,5 +700,4 @@ function htmlEscape(str) {
     .replace(/"/g, "&quot;");
 }
 
-// Start Render Loop
 loop();
