@@ -1,16 +1,16 @@
 /**
- * PixelJump Full Engine
- * Version: 1.4.0 (Restored Themes, Web Audio, Leaderboards & Knight Rampage Combo)
+ * PixelJump Engine
+ * Version: 1.5.0 (Dynamic Pipe Themes, Safe Item Spawning & Default Shield)
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v1.4.0";
+  const GAME_VERSION = "v1.5.0";
   const canvas = document.getElementById('gameCanvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
 
   // ==========================================
-  // 1. GAME STATE & THEME ENGINE
+  // 1. STATE & DYNAMIC THEMES
   // ==========================================
   let score = 0;
   let highScore = localStorage.getItem('pixeljump_highscore') || 0;
@@ -18,7 +18,7 @@ window.addEventListener('DOMContentLoaded', () => {
   let frameCount = 0;
   let audioMuted = false;
 
-  // Full Dynamic Themes Palette
+  // Fully distinct theme palettes for backgrounds AND pipes
   const THEMES = {
     day: {
       name: 'Day',
@@ -30,28 +30,27 @@ window.addEventListener('DOMContentLoaded', () => {
     sunset: {
       name: 'Sunset',
       background: "#ff7043",
-      pipeColor: "#e65100",
+      pipeColor: "#d84315",
       pipeAccent: "#bf360c",
       cloudColor: "rgba(255, 204, 188, 0.6)"
     },
     night: {
       name: 'Night',
       background: "#1a237e",
-      pipeColor: "#4527a0",
-      pipeAccent: "#283593",
+      pipeColor: "#512da8",
+      pipeAccent: "#311b92",
       cloudColor: "rgba(159, 168, 218, 0.4)"
     },
     retro: {
       name: 'Cyberpunk',
       background: "#212121",
-      pipeColor: "#00e676",
-      pipeAccent: "#00a152",
+      pipeColor: "#00b0ff",
+      pipeAccent: "#0081cb",
       cloudColor: "rgba(255, 0, 128, 0.3)"
     }
   };
   let currentTheme = THEMES.day;
 
-  // Background Environment Elements
   const clouds = [
     { x: 50, y: 80, speed: 0.4, size: 40 },
     { x: 220, y: 140, speed: 0.6, size: 60 },
@@ -59,7 +58,7 @@ window.addEventListener('DOMContentLoaded', () => {
   ];
 
   // ==========================================
-  // 2. AUDIO SYNTHESIZER (WEB AUDIO API)
+  // 2. AUDIO SYNTHESIZER
   // ==========================================
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   let audioCtx = null;
@@ -88,9 +87,9 @@ window.addEventListener('DOMContentLoaded', () => {
         osc.stop(now + 0.1);
       } else if (type === 'item') {
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(523.25, now); // C5
-        osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
-        osc.frequency.setValueAtTime(783.99, now + 0.16); // G5
+        osc.frequency.setValueAtTime(523.25, now);
+        osc.frequency.setValueAtTime(659.25, now + 0.08);
+        osc.frequency.setValueAtTime(783.99, now + 0.16);
         gain.gain.setValueAtTime(0.2, now);
         gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
         osc.start(now);
@@ -112,13 +111,11 @@ window.addEventListener('DOMContentLoaded', () => {
         osc.start(now);
         osc.stop(now + 0.3);
       }
-    } catch (e) {
-      // Ignore audio resume errors
-    }
+    } catch (e) {}
   }
 
   // ==========================================
-  // 3. PLAYER & CHARACTERS
+  // 3. PLAYER & INITIAL STATE
   // ==========================================
   const CHARACTERS = {
     cat: { id: 'cat', name: 'Cat', color: '#ff9800', src: 'cat.png', loaded: false, sprite: new Image() },
@@ -143,10 +140,9 @@ window.addEventListener('DOMContentLoaded', () => {
     vy: 0,
     gravity: 0.35,
     jumpStrength: -7,
-    inventory: { shield: false, sword: false }
+    inventory: { shield: true, sword: false } // RESTORED DEFAULT SHIELD
   };
 
-  // Medieval Knight Combo State
   const knightPowerup = {
     active: false,
     pipesRemaining: 0,
@@ -154,14 +150,13 @@ window.addEventListener('DOMContentLoaded', () => {
     slashTimer: 0
   };
 
-  // Entity Containers
   let pipes = [];
   let items = [];
   let particles = [];
   let floatingTexts = [];
 
   // ==========================================
-  // 4. INPUT & UI EVENT LISTENERS
+  // 4. INPUT & EVENT LISTENERS
   // ==========================================
   function jump() {
     initAudio();
@@ -192,9 +187,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const reader = new FileReader();
       reader.onload = (evt) => {
         const img = new Image();
-        img.onload = () => {
-          customAvatarImg = img;
-        };
+        img.onload = () => { customAvatarImg = img; };
         img.src = evt.target.result;
       };
       reader.readAsDataURL(file);
@@ -202,15 +195,21 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==========================================
-  // 5. KNIGHT COMBO & ITEM LOGIC
+  // 5. ITEM SPAWNING & COMBOS
   // ==========================================
-  function spawnItem(pipeX) {
-    if (Math.random() < 0.35) {
-      const type = Math.random() > 0.5 ? 'shield' : 'sword';
+  // Spawns items strictly within the open gap between pipes
+  function spawnItem(pipeX, topHeight, gap) {
+    if (Math.random() < 0.4) {
+      // If player doesn't have sword, spawn sword more frequently
+      const type = !player.inventory.sword ? 'sword' : (Math.random() > 0.5 ? 'shield' : 'sword');
+      
+      // Calculate center of the open gap (with safety margin)
+      const safeY = topHeight + (gap / 2) - 10;
+
       items.push({
         type: type,
-        x: pipeX + 15,
-        y: 150 + Math.random() * 250,
+        x: pipeX + 16,
+        y: safeY,
         size: 22,
         collected: false
       });
@@ -264,16 +263,17 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // 6. PIPELINE & GAME ENGINE UPDATES
+  // 6. GAME LOOP UPDATES
   // ==========================================
   function spawnPipe() {
-    const gap = 140;
+    const gap = 145;
     const minHeight = 50;
     const maxHeight = canvas.height - gap - minHeight;
     const topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
 
+    const pipeX = canvas.width;
     pipes.push({
-      x: canvas.width,
+      x: pipeX,
       width: 54,
       topHeight: topHeight,
       bottomY: topHeight + gap,
@@ -281,36 +281,35 @@ window.addEventListener('DOMContentLoaded', () => {
       shattered: false
     });
 
-    spawnItem(canvas.width);
+    // Pass topHeight & gap so items spawn safely in the middle of the gap
+    spawnItem(pipeX, topHeight, gap);
   }
 
   function update() {
     if (gameOver) return;
     frameCount++;
 
-    // Dynamic Theme Switching Progression
+    // Theme Switcher Progression
     if (score >= 30) currentTheme = THEMES.retro;
     else if (score >= 20) currentTheme = THEMES.night;
     else if (score >= 10) currentTheme = THEMES.sunset;
     else currentTheme = THEMES.day;
 
-    // Cloud Animations
     clouds.forEach(c => {
       c.x -= c.speed;
       if (c.x + c.size * 2 < 0) c.x = canvas.width + 50;
     });
 
-    // Player Gravity
     player.vy += player.gravity;
     player.y += player.vy;
 
     if (player.y + player.height >= canvas.height || player.y <= 0) {
-      endGame();
+      handlePlayerHit();
     }
 
     if (frameCount % 110 === 0) spawnPipe();
 
-    // Update Floating Texts
+    // Floating text
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
       const ft = floatingTexts[i];
       ft.y += ft.vy;
@@ -318,7 +317,7 @@ window.addEventListener('DOMContentLoaded', () => {
       if (ft.alpha <= 0) floatingTexts.splice(i, 1);
     }
 
-    // Update Shatter Particles
+    // Particles
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
       p.x += p.vx;
@@ -329,7 +328,7 @@ window.addEventListener('DOMContentLoaded', () => {
       if (p.alpha <= 0) particles.splice(i, 1);
     }
 
-    // Update Items
+    // Collectibles
     for (let i = items.length - 1; i >= 0; i--) {
       const item = items[i];
       item.x -= 2;
@@ -347,7 +346,7 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Update Pipes & Knight Slicing
+    // Pipes & Knight Slicing
     const knightX = player.x + knightPowerup.xOffset;
 
     for (let i = pipes.length - 1; i >= 0; i--) {
@@ -384,22 +383,37 @@ window.addEventListener('DOMContentLoaded', () => {
           player.x < pipe.x + pipe.width &&
           (player.y < pipe.topHeight || player.y + player.height > pipe.bottomY)
         );
-        if (hitBox) endGame();
+
+        if (hitBox) {
+          handlePlayerHit();
+        }
       }
 
       if (pipe.x + pipe.width < 0) pipes.splice(i, 1);
     }
   }
 
+  // Handle Shield Protection
+  function handlePlayerHit() {
+    if (player.inventory.shield) {
+      player.inventory.shield = false;
+      player.vy = player.jumpStrength; // Bounce back safely
+      playSound('shatter');
+      spawnFloatingText("SHIELD ABSORBED HIT!", player.x - 20, player.y - 20, "#00e676");
+    } else {
+      endGame();
+    }
+  }
+
   // ==========================================
-  // 7. COMPLETE GRAPHICS RENDERER
+  // 7. RENDERING PIPELINE
   // ==========================================
   function draw() {
-    // 1. Theme Background
+    // Background Theme
     ctx.fillStyle = currentTheme.background;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 2. Parallax Theme Clouds
+    // Dynamic Clouds
     ctx.fillStyle = currentTheme.cloudColor;
     clouds.forEach(c => {
       ctx.beginPath();
@@ -409,7 +423,7 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.fill();
     });
 
-    // 3. Pipes & Accent Caps
+    // Theme-Driven Pipe Rendering
     pipes.forEach(pipe => {
       if (pipe.shattered) return;
 
@@ -417,19 +431,19 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.fillRect(pipe.x, 0, pipe.width, pipe.topHeight);
       ctx.fillRect(pipe.x, pipe.bottomY, pipe.width, canvas.height - pipe.bottomY);
 
-      // Pipe Rim Highlight/Caps
+      // Pipe Rim Caps
       ctx.fillStyle = currentTheme.pipeAccent;
       ctx.fillRect(pipe.x - 3, pipe.topHeight - 15, pipe.width + 6, 15);
       ctx.fillRect(pipe.x - 3, pipe.bottomY, pipe.width + 6, 15);
     });
 
-    // 4. Collectible Items
+    // Items
     items.forEach(item => {
-      ctx.font = "20px sans-serif";
+      ctx.font = "22px sans-serif";
       ctx.fillText(item.type === 'shield' ? '🛡️' : '⚔️', item.x, item.y);
     });
 
-    // 5. Shatter Particles
+    // Particles
     particles.forEach(p => {
       ctx.save();
       ctx.globalAlpha = Math.max(0, p.alpha);
@@ -440,7 +454,19 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.restore();
     });
 
-    // 6. Render Player (Custom Upload -> Sprite -> Procedural Fallback)
+    // Player Rendering & Shield Aura
+    if (player.inventory.shield) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(player.x + player.width / 2, player.y + player.height / 2, player.width / 2 + 6, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0, 230, 118, 0.35)";
+      ctx.fill();
+      ctx.strokeStyle = "#00e676";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    }
+
     if (customAvatarImg) {
       ctx.drawImage(customAvatarImg, player.x, player.y, player.width, player.height);
     } else if (activeCharacter.loaded) {
@@ -455,12 +481,12 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.fillText("🐱", player.x + 8, player.y + 23);
     }
 
-    // 7. Knight Powerup Companion Avatar
+    // Knight Companion Avatar
     if (knightPowerup.active) {
       drawKnight(player.x + knightPowerup.xOffset, player.y);
     }
 
-    // 8. Floating Scores/Text Popups
+    // Floating Text
     floatingTexts.forEach(ft => {
       ctx.save();
       ctx.globalAlpha = Math.max(0, ft.alpha);
@@ -470,7 +496,7 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.restore();
     });
 
-    // 9. HUD Overlay
+    // HUD
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 18px sans-serif";
     ctx.fillText(`Score: ${score}`, 15, 30);
@@ -493,7 +519,6 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.fillText(`Knight Destruction: ${knightPowerup.pipesRemaining}`, 15, 90);
     }
 
-    // 10. Game Over Screen
     if (gameOver) {
       ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -539,7 +564,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function resetGame() {
     player.y = 250;
     player.vy = 0;
-    player.inventory.shield = false;
+    player.inventory.shield = true; // RESTORE SHIELD ON RESET
     player.inventory.sword = false;
     knightPowerup.active = false;
     knightPowerup.pipesRemaining = 0;
@@ -558,6 +583,5 @@ window.addEventListener('DOMContentLoaded', () => {
     requestAnimationFrame(gameLoop);
   }
 
-  // Start Full Engine
   gameLoop();
 });
