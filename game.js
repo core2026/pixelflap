@@ -7,8 +7,8 @@ const container = document.getElementById("game-container");
 
 // Dynamic Resolution Scaler
 function resizeCanvas() {
-  canvas.width = container.clientWidth;
-  canvas.height = container.clientHeight;
+  canvas.width = container.clientWidth || window.innerWidth;
+  canvas.height = container.clientHeight || window.innerHeight;
 }
 
 window.addEventListener("resize", resizeCanvas);
@@ -181,7 +181,6 @@ function stopBGM() {
   }
 }
 
-// Info Modal Controls
 infoBtn.addEventListener("click", () => {
   infoModal.classList.remove("hidden");
 });
@@ -190,7 +189,6 @@ closeInfoBtn.addEventListener("click", () => {
   infoModal.classList.add("hidden");
 });
 
-// Controls & Avatars
 avatarBtns.forEach(btn => {
   btn.addEventListener("click", () => {
     avatarBtns.forEach(b => b.classList.remove("active"));
@@ -221,22 +219,21 @@ initialsInput.addEventListener("input", () => {
 });
 
 function jump() {
+  if (gameState !== "PLAYING") return;
+
   initAudio();
+  player.velocity = player.jump;
+  playSound("jump");
 
-  if (gameState === "PLAYING") {
-    player.velocity = player.jump;
-    playSound("jump");
-
-    for (let i = 0; i < 6; i++) {
-      particles.push({
-        x: player.x + 10,
-        y: player.y + player.size,
-        vx: (Math.random() - 0.5) * 2 - 2,
-        vy: Math.random() * 2 + 1,
-        life: 18,
-        color: currentTheme.pipe
-      });
-    }
+  for (let i = 0; i < 6; i++) {
+    particles.push({
+      x: player.x + 10,
+      y: player.y + player.size,
+      vx: (Math.random() - 0.5) * 2 - 2,
+      vy: Math.random() * 2 + 1,
+      life: 18,
+      color: currentTheme.pipe
+    });
   }
 }
 
@@ -249,14 +246,20 @@ window.addEventListener("keydown", (e) => {
 });
 
 canvas.addEventListener("touchstart", (e) => {
-  e.preventDefault();
-  jump();
+  if (gameState === "PLAYING") {
+    e.preventDefault();
+    jump();
+  }
 }, { passive: false });
 
-canvas.addEventListener("mousedown", jump);
+canvas.addEventListener("mousedown", (e) => {
+  if (gameState === "PLAYING") {
+    jump();
+  }
+});
 
-// Start / Restart / Change Character Handlers
-startBtn.addEventListener("click", () => {
+startBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
   initAudio();
   
   const inputVal = initialsInput.value.trim().toUpperCase();
@@ -271,14 +274,15 @@ startBtn.addEventListener("click", () => {
   startGame();
 });
 
-restartBtn.addEventListener("click", () => {
+restartBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
   initAudio();
   gameOverScreen.classList.add("hidden");
   startGame();
 });
 
-// Explicit return to Start Menu
-changeCharBtn.addEventListener("click", () => {
+changeCharBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
   stopBGM();
   gameState = "MENU";
   gameOverScreen.classList.add("hidden");
@@ -288,10 +292,11 @@ changeCharBtn.addEventListener("click", () => {
 });
 
 function startGame() {
+  resizeCanvas();
   currentTheme = themes[Math.floor(Math.random() * themes.length)];
 
   player.y = canvas.height / 2;
-  player.velocity = 0;
+  player.velocity = player.jump;
   player.hasShield = false;
   activePowerUps.slowMoTimer = 0;
   activePowerUps.doubleScoreTimer = 0;
@@ -317,8 +322,11 @@ function startGame() {
 
   startScreen.classList.add("hidden");
   infoModal.classList.add("hidden");
-  gameState = "PLAYING";
-  startBGM();
+  
+  setTimeout(() => {
+    gameState = "PLAYING";
+    startBGM();
+  }, 50);
 }
 
 function loop() {
@@ -342,15 +350,18 @@ function update() {
   player.velocity += player.gravity * (isSlowMo ? 0.75 : 1.0);
   player.y += player.velocity;
 
-  if (player.y + player.size >= canvas.height || player.y <= 0) {
-    if (player.hasShield) {
-      player.hasShield = false;
-      player.velocity = -6;
-      playSound("shield_break");
-      triggerHaptic([40, 30, 40]);
-      addPopupText("SHIELD BROKEN!", player.x, player.y - 10, "#ff1744");
-    } else {
-      triggerGameOver();
+  if (frames > 5) {
+    if (player.y + player.size >= canvas.height || player.y <= 0) {
+      if (player.hasShield) {
+        player.hasShield = false;
+        player.velocity = -6;
+        playSound("shield_break");
+        triggerHaptic([40, 30, 40]);
+        addPopupText("SHIELD BROKEN!", player.x, player.y - 10, "#ff1744");
+      } else {
+        triggerGameOver();
+        return;
+      }
     }
   }
 
@@ -421,6 +432,7 @@ function update() {
         addPopupText("SHIELD BROKEN!", player.x, player.y - 10, "#ff1744");
       } else {
         triggerGameOver();
+        return;
       }
     }
 
@@ -449,6 +461,7 @@ function update() {
         addPopupText("SHIELD BROKEN!", player.x, player.y - 10, "#ff1744");
       } else {
         triggerGameOver();
+        return;
       }
     }
   });
