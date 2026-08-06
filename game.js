@@ -1,7 +1,7 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.1.01
+ * Version: v2.1.03
  *
  * WHAT CHANGED IN v2.1.0
  * - Shield pickup now destroys the pipe it collides with (small hop instead
@@ -22,6 +22,15 @@
  * - The leaderboard is now backed by the Cloudflare Worker + D1 database in
  *   index.js instead of localStorage-only. See CONFIG.API_BASE_URL below.
  *
+ * WHAT CHANGED IN v2.1.02
+ * - Fixed date display showing "undefined" when D1 database timestamps are
+ *   missing or malformed by adding null-checks and NaN date validation.
+ *
+ * WHAT CHANGED IN v2.1.03
+ * - Enhanced formatServerDate and fetchLeaderboard with property fallback checks
+ *   (created_at, createdAt, date, timestamp) to prevent literal "undefined" output
+ *   if Worker API property names vary or local cache was stale.
+ *
  * =============================================================================
  * AI / DEVELOPER EDITING REQUIREMENT
  * =============================================================================
@@ -36,16 +45,13 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.1.0";
+  const GAME_VERSION = "v2.1.03";
 
   // ===========================================================================
   // 0. CONFIG
   // ===========================================================================
   const CONFIG = {
-    // TODO(dev): replace with your deployed Worker URL, e.g.
-    // "https://pixeljump-leaderboard.<your-subdomain>.workers.dev"
-    // This must point at the index.js Worker that talks to your D1 database
-    // named "game-leaderboard". Leave as-is to run in local/offline mode.
+    // API Worker URL talking to D1 database
     API_BASE_URL: "https://game-leaderboard-api.acekallas.workers.dev",
     // Reference design resolution. All gameplay physics/sizes are scaled
     // relative to this so the game *feels* the same on any screen size.
@@ -108,12 +114,9 @@ window.addEventListener('DOMContentLoaded', () => {
   let scoreMultiplierTimer = 0;
 
   // Live logical (CSS-pixel) size of the canvas — recalculated on resize.
-  // Everything in update()/draw() is positioned relative to VW/VH instead of
-  // hard-coded pixel numbers, which is what makes the layout scale cleanly.
   let VW = CONFIG.BASE_W;
   let VH = CONFIG.BASE_H;
-  // Uniform gameplay scale factor vs. the reference design resolution, used
-  // to keep physics (gravity, speed, sizes) feeling consistent on any screen.
+  // Uniform gameplay scale factor vs. reference design resolution.
   let SCALE = 1;
 
   const THEMES = {
@@ -124,8 +127,6 @@ window.addEventListener('DOMContentLoaded', () => {
   };
   let currentTheme = THEMES.day;
 
-  // Cloud positions are stored as 0-1 fractions of VW/VH so they redistribute
-  // correctly whenever the canvas is resized.
   const clouds = [
     { fx: 0.11, fy: 0.13, speed: 0.4, size: 50 },
     { fx: 0.55, fy: 0.21, speed: 0.6, size: 70 },
@@ -134,8 +135,7 @@ window.addEventListener('DOMContentLoaded', () => {
   clouds.forEach(c => { c.x = c.fx * VW; c.y = c.fy * VH; });
 
   // ===========================================================================
-  // 3. AUDIO SYNTHESIZER (unchanged logic — tiny procedural sound effects,
-  //    no audio files needed)
+  // 3. AUDIO SYNTHESIZER
   // ===========================================================================
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   let audioCtx = null;
@@ -183,7 +183,7 @@ window.addEventListener('DOMContentLoaded', () => {
         gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
         osc.start(now); osc.stop(now + 0.3);
       }
-    } catch (e) { /* Audio can fail silently (e.g. autoplay policy) — non-critical */ }
+    } catch (e) { /* Audio can fail silently — non-critical */ }
   }
 
   // ===========================================================================
@@ -218,18 +218,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // ===========================================================================
   // 5. RESPONSIVE CANVAS SIZING
-  // Runs on load and every resize/orientation change. Recomputes VW/VH (the
-  // logical pixel size the game "thinks" in) and SCALE (how much bigger or
-  // smaller that is than the 450x750 reference design), then rescales the
-  // player's physics so the game feels equally fast/floaty everywhere.
   // ===========================================================================
   function resizeCanvas() {
     const dpr = window.devicePixelRatio || 1;
     VW = gameContainer.clientWidth;
     VH = gameContainer.clientHeight;
 
-    // Render at device-pixel resolution for crispness, but keep all game
-    // logic working in CSS-pixel (VW/VH) space via this transform.
     canvas.width = Math.round(VW * dpr);
     canvas.height = Math.round(VH * dpr);
     canvas.style.width = VW + 'px';
@@ -237,7 +231,7 @@ window.addEventListener('DOMContentLoaded', () => {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     SCALE = Math.min(VW / CONFIG.BASE_W, VH / CONFIG.BASE_H);
-    SCALE = Math.max(0.55, Math.min(SCALE, 2.4)); // clamp so ultra-wide/tall screens stay playable
+    SCALE = Math.max(0.55, Math.min(SCALE, 2.4));
 
     player.gravity = 0.36 * SCALE;
     player.jumpStrength = -7.2 * SCALE;
@@ -252,12 +246,26 @@ window.addEventListener('DOMContentLoaded', () => {
   // ===========================================================================
   // 6. LEADERBOARD (Cloudflare Worker + D1, with local-cache fallback)
   // ===========================================================================
-  function formatServerDate(iso) {
+  function formatServerDate(rawDate) {
+    if (!rawDate) return "--";
+    
     try {
-      const d = new Date(iso);
+      const d = new Date(rawDate);
+      if (isNaN(d.getTime())) return "--";
+
       const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-      return `${months[d.getMonth()]} ${String(d.getDate()).padStart(2,'0')}, ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-    } catch (e) { return "--"; }
+      const month = months[d.getMonth()];
+      
+      if (!month) return "--";
+
+      const date = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const mins = String(d.getMinutes()).padStart(2, '0');
+
+      return `${month} ${date}, ${hours}:${mins}`;
+    } catch (e) {
+      return "--";
+    }
   }
 
   function setLeaderboardStatus(text) {
@@ -291,7 +299,16 @@ window.addEventListener('DOMContentLoaded', () => {
       const res = await fetch(`${CONFIG.API_BASE_URL}/api/leaderboard`);
       if (!res.ok) throw new Error('Bad response');
       const data = await res.json();
-      highScores = data.map(r => ({ name: r.player_name, score: r.score, date: formatServerDate(r.created_at) }));
+      
+      highScores = data.map(r => {
+        const rawDate = r.created_at || r.createdAt || r.date || r.timestamp;
+        return {
+          name: r.player_name || r.name || "---",
+          score: r.score ?? 0,
+          date: formatServerDate(rawDate)
+        };
+      });
+
       localStorage.setItem('pixeljump_top15_cache', JSON.stringify(highScores));
       leaderboardOnline = true;
       setLeaderboardStatus('🌐 Live global scores');
@@ -311,8 +328,6 @@ window.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ name: validName, score: newScore })
       });
     } catch (err) {
-      // Offline or Worker unreachable — keep an optimistic local copy so the
-      // player still sees their score in the list this session.
       highScores.push({ name: validName, score: newScore, date: 'Just now' });
       highScores.sort((a, b) => b.score - a.score);
       highScores = highScores.slice(0, 15);
@@ -322,8 +337,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ===========================================================================
-  // 7. AVATAR SELECTOR (built once into the DOM from the AVATARS list above,
-  //    so the list only needs to be maintained in one place)
+  // 7. AVATAR SELECTOR
   // ===========================================================================
   function buildAvatarSelector() {
     avatarSelector.innerHTML = '';
@@ -356,7 +370,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function updateAvatarSelectionUI() {
     const buttons = avatarSelector.querySelectorAll('.avatar-btn');
-    buttons.forEach((btn, idx) => btn.classList.remove('active'));
+    buttons.forEach((btn) => btn.classList.remove('active'));
     if (!customAvatarImg && buttons[selectedAvatarIndex]) {
       buttons[selectedAvatarIndex].classList.add('active');
     }
@@ -379,8 +393,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   // ===========================================================================
-  // 8. "HOW TO PLAY" INFO GRID (built from data so gameplay tuning and the
-  //    guide text can never drift out of sync)
+  // 8. "HOW TO PLAY" INFO GRID
   // ===========================================================================
   const GUIDE_SECTIONS = [
     { icon: '🛡️', title: 'Aura Shield', body: 'Blocks 1 hit. Grab a 2nd to stack a double barrier!' },
@@ -413,8 +426,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ===========================================================================
-  // 10. UI EVENT WIRING (real DOM controls replace the old hand-drawn
-  //     hit-testing on the canvas — more robust, accessible, and touch-friendly)
+  // 10. UI EVENT WIRING
   // ===========================================================================
   initialsInput.addEventListener('input', () => {
     playerInitials = initialsInput.value.toUpperCase().replace(/[^A-Z]/g, '').substring(0, 3);
@@ -426,7 +438,6 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   startGameBtn.addEventListener('click', () => {
-    // Require at least one letter before play can begin — no silent "---" fallback.
     if (playerInitials.trim().length === 0) {
       initialsInput.classList.add('invalid');
       initialsInput.focus();
@@ -464,8 +475,6 @@ window.addEventListener('DOMContentLoaded', () => {
     showScreen('game');
   });
 
-  // Space / Up-arrow: jump during play, start on splash, replay on game over.
-  // Ignored while the player is actively typing in the initials field.
   window.addEventListener('keydown', (e) => {
     if (document.activeElement === initialsInput) return;
 
@@ -487,8 +496,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Tap/click/touch anywhere on the canvas = jump (only relevant during
-  // active gameplay now that menus are real DOM elements sitting on top).
   function handleJumpInput(e) {
     if (!gameStarted || gameOver) return;
     e.preventDefault();
@@ -500,8 +507,7 @@ window.addEventListener('DOMContentLoaded', () => {
   canvas.addEventListener('mousedown', handleJumpInput);
 
   // ===========================================================================
-  // 11. GAMEPLAY LOGIC (spawning, scoring, collisions — scaled by SCALE/VW/VH
-  //     so difficulty and layout stay consistent across screen sizes)
+  // 11. GAMEPLAY LOGIC
   // ===========================================================================
   function spawnItem(pipeX, topHeight, gap) {
     if (Math.random() < 0.45) {
@@ -658,8 +664,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // pipe is optional — omitted when the hit was the ceiling/floor rather than
-  // an actual pipe (in that case the shield just cushions the bump).
   function handlePlayerHit(pipe = null) {
     if (player.shieldCount > 0) {
       player.shieldCount--;
@@ -667,13 +671,12 @@ window.addEventListener('DOMContentLoaded', () => {
       const remText = player.shieldCount > 0 ? "1 SHIELD REMAINING!" : "SHIELD BROKEN!";
 
       if (pipe) {
-        // Shield smashes straight through the pipe instead of just bouncing off it.
         pipe.shattered = true;
         createPipeShatterParticles(pipe.x, 0, pipe.width, pipe.topHeight);
         createPipeShatterParticles(pipe.x, pipe.bottomY, pipe.width, VH - pipe.bottomY);
         spawnFloatingText("🛡️ SHIELD SMASH!", pipe.x, player.y - 20, "#10b981");
         spawnFloatingText(remText, player.x - 20, player.y + 10, "#10b981");
-        player.vy = player.jumpStrength * 0.5; // small hop, the pipe is already gone
+        player.vy = player.jumpStrength * 0.5;
       } else {
         player.vy = player.jumpStrength;
         spawnFloatingText(remText, player.x - 20, player.y - 20, "#10b981");
@@ -684,7 +687,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ===========================================================================
-  // 12. RENDER (gameplay layer only — menus are DOM now, see index.html)
+  // 12. RENDER
   // ===========================================================================
   function drawKnightKiteShield(x, y) {
     ctx.save();
@@ -784,7 +787,7 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.restore();
     });
 
-    // --- HUD (live score / status, only meaningful during active play) ---
+    // --- HUD ---
     const pad = 20 * SCALE;
     ctx.textAlign = "left";
     ctx.fillStyle = "#ffffff";
