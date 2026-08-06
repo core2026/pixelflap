@@ -27,7 +27,7 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-  background: #70c5ce;
+  background: #7a8fd9;
   touch-action: none;
 }
 
@@ -51,11 +51,12 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 8px;
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
   text-align: center;
-  padding: 20px;
+  padding: 16px;
+  overflow-y: auto;
 }
 
 .overlay.hidden {
@@ -192,7 +193,7 @@ body {
   flex-direction: column;
   gap: 3px;
   font-size: 0.85rem;
-  max-height: 140px;
+  max-height: 110px;
   overflow-y: auto;
 }
 
@@ -213,4 +214,19 @@ body {
 #leaderboard-list .lb-date {
   color: #8b96a1;
   font-size: 0.75rem;
+}
+
+#game-over-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.secondary-btn {
+  background: transparent !important;
+  color: #d5dbe0 !important;
+  border-color: #5a6572 !important;
+  font-size: 0.85rem !important;
+  padding: 8px 20px !important;
 }

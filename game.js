@@ -37,7 +37,7 @@ const CHARACTERS = {
   },
 
   star: {
-    radius: 16,
+    radius: 20,
     draw(ctx, x, y, radius, rotation) {
       ctx.save();
       ctx.translate(x, y);
@@ -81,54 +81,86 @@ const CHARACTERS = {
   },
 
   cat: {
-    radius: 16,
+    radius: 20,
     draw(ctx, x, y, radius, rotation) {
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(rotation);
 
-      // ears
-      ctx.fillStyle = '#e8955c';
       ctx.strokeStyle = '#1e2327';
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 3;
+
+      // outer ears (bigger + more triangular for clarity at small size)
+      ctx.fillStyle = '#e8955c';
       ctx.beginPath();
-      ctx.moveTo(-radius * 0.6, -radius * 0.6);
-      ctx.lineTo(-radius * 0.1, -radius * 1.15);
-      ctx.lineTo(-radius * 0.05, -radius * 0.4);
+      ctx.moveTo(-radius * 0.75, -radius * 0.5);
+      ctx.lineTo(-radius * 0.15, -radius * 1.35);
+      ctx.lineTo(-radius * 0.05, -radius * 0.35);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.moveTo(radius * 0.6, -radius * 0.6);
-      ctx.lineTo(radius * 0.1, -radius * 1.15);
-      ctx.lineTo(radius * 0.05, -radius * 0.4);
+      ctx.moveTo(radius * 0.75, -radius * 0.5);
+      ctx.lineTo(radius * 0.15, -radius * 1.35);
+      ctx.lineTo(radius * 0.05, -radius * 0.35);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
+
+      // inner ears (pink, for contrast/readability)
+      ctx.fillStyle = '#f4a9c0';
+      ctx.beginPath();
+      ctx.moveTo(-radius * 0.55, -radius * 0.55);
+      ctx.lineTo(-radius * 0.22, -radius * 1.0);
+      ctx.lineTo(-radius * 0.12, -radius * 0.5);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(radius * 0.55, -radius * 0.55);
+      ctx.lineTo(radius * 0.22, -radius * 1.0);
+      ctx.lineTo(radius * 0.12, -radius * 0.5);
+      ctx.closePath();
+      ctx.fill();
 
       // head
       ctx.fillStyle = '#f4a862';
       ctx.beginPath();
-      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.arc(0, radius * 0.05, radius, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      // eyes
-      ctx.fillStyle = '#1e2327';
+      // big round eyes
+      ctx.fillStyle = '#fff';
       ctx.beginPath();
-      ctx.arc(-radius * 0.3, -radius * 0.1, radius * 0.1, 0, Math.PI * 2);
-      ctx.arc(radius * 0.3, -radius * 0.1, radius * 0.1, 0, Math.PI * 2);
+      ctx.arc(-radius * 0.32, -radius * 0.02, radius * 0.22, 0, Math.PI * 2);
+      ctx.arc(radius * 0.32, -radius * 0.02, radius * 0.22, 0, Math.PI * 2);
       ctx.fill();
 
-      // nose + whiskers
-      ctx.strokeStyle = '#1e2327';
-      ctx.lineWidth = 1.5;
+      ctx.fillStyle = '#1e2327';
       ctx.beginPath();
-      ctx.moveTo(-radius * 0.5, radius * 0.15);
-      ctx.lineTo(-radius * 0.05, radius * 0.25);
-      ctx.moveTo(radius * 0.5, radius * 0.15);
-      ctx.lineTo(radius * 0.05, radius * 0.25);
+      ctx.arc(-radius * 0.28, -radius * 0.02, radius * 0.11, 0, Math.PI * 2);
+      ctx.arc(radius * 0.28, -radius * 0.02, radius * 0.11, 0, Math.PI * 2);
+      ctx.fill();
+
+      // pink nose
+      ctx.fillStyle = '#e8637f';
+      ctx.beginPath();
+      ctx.moveTo(-radius * 0.09, radius * 0.28);
+      ctx.lineTo(radius * 0.09, radius * 0.28);
+      ctx.lineTo(0, radius * 0.4);
+      ctx.closePath();
+      ctx.fill();
+
+      // whiskers
+      ctx.strokeStyle = '#1e2327';
+      ctx.lineWidth = 1.75;
+      ctx.beginPath();
+      ctx.moveTo(-radius * 0.75, radius * 0.32);
+      ctx.lineTo(-radius * 0.15, radius * 0.38);
+      ctx.moveTo(radius * 0.75, radius * 0.32);
+      ctx.lineTo(radius * 0.15, radius * 0.38);
       ctx.stroke();
 
       ctx.restore();
@@ -136,7 +168,7 @@ const CHARACTERS = {
   },
 
   dog: {
-    radius: 16,
+    radius: 20,
     draw(ctx, x, y, radius, rotation) {
       ctx.save();
       ctx.translate(x, y);
@@ -210,6 +242,7 @@ const initialsEntry = document.getElementById('initials-entry');
 const initialsInput = document.getElementById('initials-input');
 const saveScoreBtn = document.getElementById('save-score-btn');
 const leaderboardList = document.getElementById('leaderboard-list');
+const changeCharacterBtn = document.getElementById('change-character-btn');
 
 const LEADERBOARD_KEY = 'pixelflap-leaderboard';
 const MAX_LEADERBOARD_ENTRIES = 10;
@@ -394,22 +427,58 @@ function update() {
   }
 }
 
+function drawCrystalSpire(x, y, w, h, capAtBottom) {
+  ctx.save();
+
+  // gradient body — cool purple/blue, distinct from a plain green pipe
+  const grad = ctx.createLinearGradient(x, 0, x + w, 0);
+  grad.addColorStop(0, '#4a3fc7');
+  grad.addColorStop(0.5, '#8b7ff5');
+  grad.addColorStop(1, '#4a3fc7');
+  ctx.fillStyle = grad;
+  ctx.strokeStyle = '#241c66';
+  ctx.lineWidth = 3;
+
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 10);
+  ctx.fill();
+  ctx.stroke();
+
+  // vertical highlight stripe for a faceted-crystal feel
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+  ctx.fillRect(x + w * 0.18, y + 6, w * 0.16, h - 12);
+
+  // diamond cap pointing toward the gap
+  const capSize = w * 0.65;
+  const capX = x + w / 2;
+  const capY = capAtBottom ? y + h : y;
+  const dir = capAtBottom ? 1 : -1;
+
+  ctx.fillStyle = '#a89bff';
+  ctx.beginPath();
+  ctx.moveTo(capX, capY + dir * capSize * 0.55);
+  ctx.lineTo(capX + capSize / 2, capY);
+  ctx.lineTo(capX, capY - dir * capSize * 0.55);
+  ctx.lineTo(capX - capSize / 2, capY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 function draw() {
-  // background
-  ctx.fillStyle = '#70c5ce';
+  // sky — soft dusk gradient instead of flat blue
+  const sky = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
+  sky.addColorStop(0, '#6f86d6');
+  sky.addColorStop(1, '#c99fd6');
+  ctx.fillStyle = sky;
   ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-  // pipes
-  ctx.fillStyle = '#4caf50';
-  ctx.strokeStyle = '#1e2327';
-  ctx.lineWidth = 3;
+  // crystal spires
   for (const pipe of pipes) {
-    // top pipe
-    ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.gapTop);
-    ctx.strokeRect(pipe.x, 0, PIPE_WIDTH, pipe.gapTop);
-    // bottom pipe
-    ctx.fillRect(pipe.x, pipe.gapBottom, PIPE_WIDTH, GAME_HEIGHT - pipe.gapBottom);
-    ctx.strokeRect(pipe.x, pipe.gapBottom, PIPE_WIDTH, GAME_HEIGHT - pipe.gapBottom);
+    drawCrystalSpire(pipe.x, 0, PIPE_WIDTH, pipe.gapTop, true);
+    drawCrystalSpire(pipe.x, pipe.gapBottom, PIPE_WIDTH, GAME_HEIGHT - pipe.gapBottom, false);
   }
 
   // player
@@ -469,6 +538,12 @@ document.addEventListener('keydown', (e) => {
 
 startBtn.addEventListener('click', startGame);
 retryBtn.addEventListener('click', startGame);
+
+changeCharacterBtn.addEventListener('click', () => {
+  state = 'idle';
+  gameOverScreen.classList.add('hidden');
+  startScreen.classList.remove('hidden');
+});
 
 // ============================================================
 // HIGH SCORE / INITIALS ENTRY
