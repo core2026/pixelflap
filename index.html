@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>PixelJump</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -14,8 +14,8 @@
       <h1 class="title">PIXELJUMP</h1>
 
       <div class="input-group">
-        <label for="player-initials">Player Initials</label>
-        <input type="text" id="player-initials" maxlength="3" value="ACE">
+        <label for="player-initials">Player Initials (1-3 Letters)</label>
+        <input type="text" id="player-initials" maxlength="3" value="ACE" placeholder="ACE">
       </div>
 
       <div class="input-group">
@@ -70,7 +70,7 @@
             <small>+5 bonus pts</small>
           </div>
         </div>
-        <div class="info-item" style="grid-column: span 2;">
+        <div class="info-item full-width">
           <span class="icon">☄️</span>
           <div>
             <strong>Moving Obstacles & Comets</strong>
@@ -95,6 +95,7 @@
       </div>
 
       <button id="restart-btn" class="btn">PLAY AGAIN</button>
+      <button id="change-char-btn" class="btn secondary-btn">🚀 CHANGE AVATAR / INITIALS</button>
     </div>
 
     <!-- Main Canvas -->

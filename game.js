@@ -10,8 +10,13 @@ function resizeCanvas() {
   canvas.width = container.clientWidth;
   canvas.height = container.clientHeight;
 }
+
 window.addEventListener("resize", resizeCanvas);
+window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 200));
+
+// Initial sizing checks for iOS Safari render delays
 resizeCanvas();
+setTimeout(resizeCanvas, 100);
 
 // UI Elements
 const startScreen = document.getElementById("start-screen");
@@ -21,6 +26,7 @@ const infoBtn = document.getElementById("info-btn");
 const closeInfoBtn = document.getElementById("close-info-btn");
 const startBtn = document.getElementById("start-btn");
 const restartBtn = document.getElementById("restart-btn");
+const changeCharBtn = document.getElementById("change-char-btn");
 const initialsInput = document.getElementById("player-initials");
 const avatarBtns = document.querySelectorAll(".avatar-btn");
 const customAvatarInput = document.getElementById("custom-avatar-input");
@@ -147,7 +153,7 @@ function playSound(type) {
 function startBGM() {
   stopBGM();
   bgmStep = 0;
-  const bassNotes = [110, 110, 130.81, 110, 146.83, 130.81, 98, 110]; // A2, C3, D3, G2
+  const bassNotes = [110, 110, 130.81, 110, 146.83, 130.81, 98, 110];
   
   bgmTimer = setInterval(() => {
     if (gameState !== "PLAYING" || !audioCtx) return;
@@ -212,6 +218,11 @@ customAvatarInput.addEventListener("change", (e) => {
   }
 });
 
+// Clear red highlight on input focus
+initialsInput.addEventListener("input", () => {
+  initialsInput.classList.remove("invalid");
+});
+
 function jump() {
   initAudio();
 
@@ -254,9 +265,20 @@ canvas.addEventListener("touchstart", (e) => {
 
 canvas.addEventListener("mousedown", jump);
 
-// Start / Restart Handlers
+// Start / Restart / Change Character Handlers
 startBtn.addEventListener("click", () => {
   initAudio();
+  
+  // Validate 1-3 letters for initials
+  const inputVal = initialsInput.value.trim().toUpperCase();
+  if (!inputVal || inputVal.length < 1 || inputVal.length > 3) {
+    initialsInput.classList.add("invalid");
+    initialsInput.focus();
+    triggerHaptic([50, 50]);
+    return;
+  }
+  
+  playerInitials = inputVal;
   startGame();
 });
 
@@ -266,10 +288,13 @@ restartBtn.addEventListener("click", () => {
   startGame();
 });
 
-function startGame() {
-  const inputVal = initialsInput.value.trim().toUpperCase();
-  playerInitials = inputVal.length > 0 ? inputVal.substring(0, 3) : "ACE";
+changeCharBtn.addEventListener("click", () => {
+  gameOverScreen.classList.add("hidden");
+  startScreen.classList.remove("hidden");
+  gameState = "MENU";
+});
 
+function startGame() {
   currentTheme = themes[Math.floor(Math.random() * themes.length)];
 
   player.y = canvas.height / 2;
