@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURATION
 // ==========================================
-const WORKER_URL = "https://pixelflap-main.acekallas.workers.dev";
+const WORKER_URL = "https://game-leaderboard-api.acekallas.workers.dev";
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
@@ -37,13 +37,15 @@ let particles = [];
 let stars = [];
 let frameCount = 0;
 
-// Color Themes for Score Progression
-const SKY_THEMES = [
-  { top: "#1e1b4b", bottom: "#311042" }, // Dusk
-  { top: "#0f172a", bottom: "#1e3a8a" }, // Cosmic Navy
-  { top: "#311042", bottom: "#701a75" }, // Synthwave Magenta
-  { top: "#064e3b", bottom: "#022c22" }  // Deep Emerald
+// Dynamic Theme Presets (Chosen randomly on game start)
+const THEME_PRESETS = [
+  { name: "Synthwave Dusk", top: "#1e1b4b", bottom: "#311042", crystal1: "#a855f7", crystal2: "#3b82f6", glow: "#a855f7", trail: "#f97316" },
+  { name: "Cyber Emerald", top: "#022c22", bottom: "#064e3b", crystal1: "#10b981", crystal2: "#06b6d4", glow: "#10b981", trail: "#34d399" },
+  { name: "Neon Sunset", top: "#450a0a", bottom: "#7c2d12", crystal1: "#f97316", crystal2: "#eab308", glow: "#f97316", trail: "#facc15" },
+  { name: "Deep Void", top: "#030712", bottom: "#111827", crystal1: "#6366f1", crystal2: "#a855f7", glow: "#818cf8", trail: "#c084fc" },
+  { name: "Electric Sakura", top: "#500724", bottom: "#831843", crystal1: "#f472b6", crystal2: "#fb7185", glow: "#f472b6", trail: "#fbcfe8" }
 ];
+let activeTheme = THEME_PRESETS[0];
 
 // UI Elements
 const charSelectOverlay = document.getElementById("character-select");
@@ -55,7 +57,7 @@ const imageUpload = document.getElementById("imageUpload");
 const uploadStatus = document.getElementById("uploadStatus");
 const playerNameInput = document.getElementById("playerName");
 
-// Restrict initials input to max 3 uppercase letters
+// Restrict initials input to max 3 uppercase letters (allows 1, 2, or 3 letters)
 playerNameInput.addEventListener("input", (e) => {
   e.target.value = e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase();
 });
@@ -135,8 +137,9 @@ changeCharBtn.addEventListener("click", () => {
 
 function startGame() {
   const initials = playerNameInput.value.trim();
-  if (initials.length !== 3) {
-    alert("Please enter exactly 3 letters for your initials.");
+  // Validates length to be strictly between 1 and 3 characters
+  if (initials.length < 1 || initials.length > 3) {
+    alert("Please enter 1 to 3 letters for your initials.");
     playerNameInput.focus();
     return;
   }
@@ -154,6 +157,10 @@ function resetGameVars() {
   particles = [];
   score = 0;
   frameCount = 0;
+  
+  // Pick a random theme layout every time a fresh round starts
+  activeTheme = THEME_PRESETS[Math.floor(Math.random() * THEME_PRESETS.length)];
+  
   updateGameplayDimensions();
 }
 
@@ -184,7 +191,7 @@ function spawnParticle(x, y) {
     vy: Math.random() * 2 - 1,
     size: Math.random() * 4 + 2,
     alpha: 1.0,
-    color: selectedChar === "star" ? "#facc15" : selectedChar === "cat" ? "#f97316" : "#a855f7"
+    color: activeTheme.trail
   });
 }
 
@@ -269,7 +276,6 @@ function drawPlayer(x, y) {
 // MAIN LOOP & PHYSICS
 // ==========================================
 function update() {
-  // Update background starfield (Runs continuously for visual flair)
   stars.forEach((s) => {
     s.x -= s.speed;
     if (s.x < 0) s.x = canvas.width;
@@ -280,12 +286,10 @@ function update() {
   velocity += gravity;
   birdY += velocity;
 
-  // Trail Particles
   if (frameCount % 2 === 0) {
     spawnParticle(80, birdY);
   }
 
-  // Update Trail Particles
   for (let i = particles.length - 1; i >= 0; i--) {
     let p = particles[i];
     p.x += p.vx;
@@ -294,19 +298,16 @@ function update() {
     if (p.alpha <= 0) particles.splice(i, 1);
   }
 
-  // Floor / Ceiling Collision
   if (birdY + currentBirdRadius >= canvas.height || birdY - currentBirdRadius <= 0) {
     endGame();
   }
 
-  // Spawn Crystal Pillars
   frameCount++;
   if (frameCount % 90 === 0) {
     const topHeight = Math.random() * (canvas.height - currentPipeGap - 120) + 40;
     pipes.push({ x: canvas.width, top: topHeight, passed: false });
   }
 
-  // Move Pipes
   for (let i = pipes.length - 1; i >= 0; i--) {
     pipes[i].x -= 2.5;
 
@@ -331,13 +332,10 @@ function update() {
 }
 
 function draw() {
-  // Sky Theme changes every 10 points
-  const themeIndex = Math.floor(score / 10) % SKY_THEMES.length;
-  const currentTheme = SKY_THEMES[themeIndex];
-
+  // Render active randomized theme background gradient
   const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  skyGrad.addColorStop(0, currentTheme.top);
-  skyGrad.addColorStop(1, currentTheme.bottom);
+  skyGrad.addColorStop(0, activeTheme.top);
+  skyGrad.addColorStop(1, activeTheme.bottom);
   ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -360,32 +358,29 @@ function draw() {
     ctx.restore();
   });
 
-  // Pulsing Crystal Pillars
+  // Pulsing Crystal Pillars based on active theme
   pipes.forEach((p) => {
     const pulse = Math.sin(frameCount * 0.05) * 0.2 + 0.8;
     const crystalGrad = ctx.createLinearGradient(p.x, 0, p.x + currentPipeWidth, 0);
-    crystalGrad.addColorStop(0, "#a855f7");
-    crystalGrad.addColorStop(0.5, "#3b82f6");
-    crystalGrad.addColorStop(1, "#1e40af");
+    crystalGrad.addColorStop(0, activeTheme.crystal1);
+    crystalGrad.addColorStop(1, activeTheme.crystal2);
 
     ctx.fillStyle = crystalGrad;
     ctx.shadowBlur = 12 * pulse;
-    ctx.shadowColor = "#a855f7";
+    ctx.shadowColor = activeTheme.glow;
 
     // Top Crystal
     ctx.fillRect(p.x, 0, currentPipeWidth, p.top);
     // Bottom Crystal
     ctx.fillRect(p.x, p.top + currentPipeGap, currentPipeWidth, canvas.height - (p.top + currentPipeGap));
     
-    ctx.shadowBlur = 0; // Reset blur
+    ctx.shadowBlur = 0;
   });
 
-  // Draw Player Avatar
   if (gameState === "PLAYING") {
     drawPlayer(80, birdY);
   }
 
-  // Score
   if (gameState === "PLAYING") {
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 32px sans-serif";
@@ -418,7 +413,7 @@ function endGame() {
 
   gameOverOverlay.classList.remove("hidden");
 
-  const initials = (playerNameInput.value || "AAA").toUpperCase();
+  const initials = (playerNameInput.value || "ACE").toUpperCase();
   submitScore(initials, score);
 }
 
