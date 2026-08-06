@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>PixelJump - v1.14.0</title>
+  <title>PixelJump - v1.15.0</title>
 
   <!-- Game Favicon -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f172a'/><circle cx='50' cy='50' r='38' fill='%23059669'/><circle cx='50' cy='50' r='28' fill='%2310b981'/><text x='50' y='64' font-size='42' text-anchor='middle' fill='white'>🚀</text></svg>">
@@ -16,42 +16,38 @@
       box-sizing: border-box;
       margin: 0;
       padding: 0;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
     }
     html, body {
       width: 100%;
       height: 100%;
-      background-color: #0f172a;
+      background-color: #020617;
       color: #f8fafc;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      padding: 10px;
     }
     #game-container {
       position: relative;
-      width: 100%;
+      width: 100vw;
+      height: 100vh;
       max-width: 500px;
-      height: 90vh;
-      max-height: 850px;
-      aspect-ratio: 9 / 16;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 20px rgba(16, 185, 129, 0.2);
-      border-radius: 16px;
-      overflow: hidden;
+      max-height: 888px;
       display: flex;
       justify-content: center;
       align-items: center;
       background-color: #020617;
-      border: 1px solid rgba(255, 255, 255, 0.1);
     }
     canvas {
       width: 100%;
       height: 100%;
       display: block;
-      background-color: #38bdf8;
       object-fit: contain;
+      background-color: #38bdf8;
     }
     input[type="file"] {
       display: none;
@@ -66,6 +62,6 @@
 
   <input type="file" id="avatarUpload" accept="image/*">
 
-  <script src="game.js?v=1.14.0"></script>
+  <script src="game.js?v=1.15.0"></script>
 </body>
 </html>

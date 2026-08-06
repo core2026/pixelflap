@@ -1,10 +1,10 @@
 /**
  * PixelJump Engine
- * Version: 1.14.0 (Fixed Hitbox Alignment, Blank Initials Start & Unified Button Logic)
+ * Version: 1.15.0 (Dynamic Canvas Projection & Accurate Touch Bounds)
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v1.14.0";
+  const GAME_VERSION = "v1.15.0";
   const canvas = document.getElementById('gameCanvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -14,7 +14,6 @@ window.addEventListener('DOMContentLoaded', () => {
   // 1. STATE & LEADERBOARD DATA
   // ==========================================
   let score = 0;
-  // Blank initials by default unless user has previously saved initials
   let playerInitials = localStorage.getItem('pixeljump_initials') || "";
   let isEditingInitials = false;
 
@@ -32,7 +31,6 @@ window.addEventListener('DOMContentLoaded', () => {
   let frameCount = 0;
   let audioMuted = false;
 
-  // Active Powerup Timers
   let slowMoTimer = 0;
   let scoreMultiplierTimer = 0;
 
@@ -67,7 +65,6 @@ window.addEventListener('DOMContentLoaded', () => {
       const gain = audioCtx.createGain();
       osc.connect(gain);
       gain.connect(audioCtx.destination);
-
       const now = audioCtx.currentTime;
 
       if (type === 'jump') {
@@ -168,12 +165,46 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Helper function to check bounding box hits accurately
+  // ==========================================
+  // 4. ACCURATE SCREEN-TO-CANVAS MAPPING
+  // ==========================================
+  function getCanvasCoordinates(e) {
+    const rect = canvas.getBoundingClientRect();
+    let clientX = e.clientX;
+    let clientY = e.clientY;
+
+    if (e.touches && e.touches[0]) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    }
+
+    const canvasAspect = canvas.width / canvas.height;
+    const rectAspect = rect.width / rect.height;
+
+    let renderWidth, renderHeight, offsetX, offsetY;
+
+    if (rectAspect > canvasAspect) {
+      renderHeight = rect.height;
+      renderWidth = renderHeight * canvasAspect;
+      offsetX = (rect.width - renderWidth) / 2;
+      offsetY = 0;
+    } else {
+      renderWidth = rect.width;
+      renderHeight = renderWidth / canvasAspect;
+      offsetX = 0;
+      offsetY = (rect.height - renderHeight) / 2;
+    }
+
+    const canvasX = (clientX - rect.left - offsetX) * (canvas.width / renderWidth);
+    const canvasY = (clientY - rect.top - offsetY) * (canvas.height / renderHeight);
+
+    return { x: canvasX, y: canvasY };
+  }
+
   function isInside(x, y, btnX, btnY, btnW, btnH) {
     return x >= btnX && x <= btnX + btnW && y >= btnY && y <= btnY + btnH;
   }
 
-  // Prompt for mobile touch typing fallback
   function triggerInitialsPrompt() {
     const input = prompt("Enter 1-3 Initials:", playerInitials);
     if (input !== null) {
@@ -185,35 +216,21 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // 4. INPUT & CLICK HANDLING
+  // 5. INPUT & EVENT HANDLERS
   // ==========================================
   function handleCanvasClick(e) {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-
-    let clientX = e.clientX;
-    let clientY = e.clientY;
-
-    if (e.touches && e.touches[0]) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    }
-
-    const clickX = (clientX - rect.left) * scaleX;
-    const clickY = (clientY - rect.top) * scaleY;
+    const { x: clickX, y: clickY } = getCanvasCoordinates(e);
 
     if (showInfoModal) {
       showInfoModal = false;
       return;
     }
 
-    // --- SPLASH MENU BUTTONS ---
+    // MAIN SPLASH MENU
     if (!gameStarted) {
-      // 1. Initials Box Button (x:50, y:65, w:350, h:44)
+      // 1. Initials Input Box
       if (isInside(clickX, clickY, 50, 65, 350, 44)) {
         isEditingInitials = true;
-        // On touch screens, open native prompt directly for quick mobile input
         if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
           triggerInitialsPrompt();
         }
@@ -222,27 +239,27 @@ window.addEventListener('DOMContentLoaded', () => {
         isEditingInitials = false;
       }
 
-      // 2. Avatar Left Arrow Button (x:52, y:122, w:44, h:40)
+      // 2. Avatar Selection - Left Arrow
       if (isInside(clickX, clickY, 52, 122, 44, 40)) {
         selectedAvatarIndex = (selectedAvatarIndex - 1 + AVATARS.length) % AVATARS.length;
         customAvatarImg = null;
         return;
       }
 
-      // 3. Avatar Right Arrow Button (x:354, y:122, w:44, h:40)
+      // 3. Avatar Selection - Right Arrow
       if (isInside(clickX, clickY, 354, 122, 44, 40)) {
         selectedAvatarIndex = (selectedAvatarIndex + 1) % AVATARS.length;
         customAvatarImg = null;
         return;
       }
 
-      // 4. How to Play Guide Button (x:50, y:650, w:165, h:45)
+      // 4. Guide Button
       if (isInside(clickX, clickY, 50, 650, 165, 45)) {
         showInfoModal = true;
         return;
       }
 
-      // 5. Start Game Button (x:235, y:650, w:165, h:45)
+      // 5. Start Game Button
       if (isInside(clickX, clickY, 235, 650, 165, 45)) {
         if (playerInitials.trim().length > 0) {
           localStorage.setItem('pixeljump_initials', playerInitials);
@@ -255,28 +272,21 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // --- GAME OVER BUTTONS ---
+    // GAME OVER MENU
     if (gameOver) {
-      // 1. Audio Toggle Button (x:40, y:645, w:175, h:40)
       if (isInside(clickX, clickY, 40, 645, 175, 40)) {
         audioMuted = !audioMuted;
         return;
       }
-
-      // 2. Custom Avatar Upload Button (x:235, y:645, w:175, h:40)
       if (isInside(clickX, clickY, 235, 645, 175, 40)) {
         avatarFileInput.click();
         return;
       }
-
-      // 3. Home Menu Button (x:40, y:695, w:175, h:40)
       if (isInside(clickX, clickY, 40, 695, 175, 40)) {
         gameStarted = false;
         gameOver = false;
         return;
       }
-
-      // 4. Play Again Button (x:235, y:695, w:175, h:40)
       if (isInside(clickX, clickY, 235, 695, 175, 40)) {
         resetGame();
         return;
@@ -284,13 +294,12 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Gameplay Jump Tap
+    // JUMP ACTION
     initAudio();
     player.vy = player.jumpStrength;
     playSound('jump');
   }
 
-  // Keyboard Typing handling
   window.addEventListener('keydown', (e) => {
     if (!gameStarted && isEditingInitials) {
       if (e.key === 'Backspace') {
@@ -343,7 +352,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==========================================
-  // 5. GAME & LEADERBOARD LOGIC
+  // 6. GAME & LEADERBOARD LOGIC
   // ==========================================
   function spawnItem(pipeX, topHeight, gap) {
     if (Math.random() < 0.45) {
@@ -398,10 +407,8 @@ window.addEventListener('DOMContentLoaded', () => {
   function triggerGiantShieldCombo() {
     player.shieldCount = 0;
     player.inventory.sword = false;
-
     giantShield.active = true;
     giantShield.pipesRemaining = 6;
-
     score += 50;
     playSound('item');
     spawnFloatingText("+50 KNIGHT'S AEGIS RAMPAGE!", player.x - 30, player.y - 30, "#facc15");
@@ -438,11 +445,11 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // 6. GAME LOOP UPDATES
+  // 7. GAME LOOP UPDATES
   // ==========================================
   function spawnPipe() {
-    const gap = 160;
-    const minHeight = 60;
+    const gap = 165;
+    const minHeight = 70;
     const maxHeight = canvas.height - gap - minHeight;
     const topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
 
@@ -580,7 +587,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // 7. DRAWING UI & VISUAL COMPONENTS
+  // 8. RENDER UI & SCREEN LAYOUT
   // ==========================================
   function drawKnightKiteShield(x, y) {
     ctx.save();
@@ -650,7 +657,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     const displayScores = highScores.slice(0, 15);
     let rowY = startY + 76;
-    const rowStep = 23; 
+    const rowStep = 23;
 
     displayScores.forEach((hs, idx) => {
       ctx.font = "600 13px -apple-system, monospace";
@@ -872,9 +879,7 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.fillText(`Knight Shield Hits Left: ${giantShield.pipesRemaining}`, 20, hudY);
     }
 
-    // ==========================================
     // MAIN SPLASH MENU
-    // ==========================================
     if (!gameStarted) {
       ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -884,7 +889,7 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.textAlign = "center";
       ctx.fillText("PIXEL JUMP", canvas.width / 2, 45);
 
-      // Interactive Initials Box Button (Blank default display)
+      // Initials Box
       ctx.fillStyle = isEditingInitials ? "rgba(16, 185, 129, 0.2)" : "rgba(255, 255, 255, 0.08)";
       ctx.fillRect(50, 65, 350, 44);
       ctx.strokeStyle = isEditingInitials ? "#10b981" : "#facc15";
@@ -896,20 +901,18 @@ window.addEventListener('DOMContentLoaded', () => {
       const displayInit = (playerInitials !== "" ? playerInitials : "___") + (isEditingInitials ? "_" : "");
       ctx.fillText(`INITIALS: [ ${displayInit} ] ${isEditingInitials ? '(TYPING...)' : '(TAP TO EDIT)'}`, canvas.width / 2, 92);
 
-      // Interactive Avatar Selection Box Button
+      // Avatar Box
       ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
       ctx.fillRect(50, 120, 350, 44);
       ctx.strokeStyle = "#10b981";
       ctx.strokeRect(50, 120, 350, 44);
 
-      // Left Arrow Button Box
       ctx.fillStyle = "#047857";
       ctx.fillRect(52, 122, 44, 40);
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 18px -apple-system, sans-serif";
       ctx.fillText("⟨", 74, 147);
 
-      // Right Arrow Button Box
       ctx.fillStyle = "#047857";
       ctx.fillRect(354, 122, 44, 40);
       ctx.fillStyle = "#ffffff";
@@ -920,14 +923,11 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.font = "600 14px -apple-system, sans-serif";
       ctx.fillText(`AVATAR: ${customAvatarImg ? 'Custom 📁' : currentAvatar.emoji + ' ' + currentAvatar.name}`, canvas.width / 2, 147);
 
-      // Leaderboard Card
       drawLeaderboardCard(180, "🏆 TOP 15 HALL OF FAME 🏆");
 
-      // Menu Bottom Button Bar: [ 🧭 GUIDE ] [ ▶ START ]
       const btnY = 650;
       const btnH = 45;
 
-      // Guide Button (x:50, y:650, w:165, h:45)
       ctx.fillStyle = "#334155";
       ctx.fillRect(50, btnY, 165, btnH);
       ctx.strokeStyle = "#64748b";
@@ -940,7 +940,6 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.textBaseline = "middle";
       ctx.fillText("🧭 HOW TO PLAY", 132, btnY + (btnH / 2));
 
-      // Start Game Button (x:235, y:650, w:165, h:45)
       ctx.fillStyle = "#059669";
       ctx.fillRect(235, btnY, 165, btnH);
       ctx.strokeStyle = "#10b981";
@@ -955,9 +954,7 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.textAlign = "left";
     }
 
-    // ==========================================
     // GAME OVER SCREEN
-    // ==========================================
     if (gameOver) {
       ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -975,11 +972,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
       const btnW = 175;
       const btnH = 40;
-
-      // Row 1 Buttons
       const row1Y = 645;
 
-      // 1. Audio Toggle (x:40, y:645, w:175, h:40)
       ctx.fillStyle = audioMuted ? "#475569" : "#0284c7";
       ctx.fillRect(40, row1Y, btnW, btnH);
       ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
@@ -992,7 +986,6 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.textBaseline = "middle";
       ctx.fillText(audioMuted ? "🔇 AUDIO: OFF" : "🔊 AUDIO: ON", 40 + (btnW / 2), row1Y + (btnH / 2));
 
-      // 2. Custom Avatar Upload (x:235, y:645, w:175, h:40)
       ctx.fillStyle = "#0284c7";
       ctx.fillRect(235, row1Y, btnW, btnH);
       ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
@@ -1003,10 +996,8 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.font = "600 13px -apple-system, sans-serif";
       ctx.fillText("📁 CUSTOM AVATAR", 235 + (btnW / 2), row1Y + (btnH / 2));
 
-      // Row 2 Buttons
       const row2Y = 695;
 
-      // 3. Home Menu Button (x:40, y:695, w:175, h:40)
       ctx.fillStyle = "#334155";
       ctx.fillRect(40, row2Y, btnW, btnH);
       ctx.strokeStyle = "#64748b";
@@ -1017,7 +1008,6 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.font = "600 14px -apple-system, sans-serif";
       ctx.fillText("🏠 HOME", 40 + (btnW / 2), row2Y + (btnH / 2));
 
-      // 4. Play Again Button (x:235, y:695, w:175, h:40)
       ctx.fillStyle = "#059669";
       ctx.fillRect(235, row2Y, btnW, btnH);
       ctx.strokeStyle = "#10b981";
