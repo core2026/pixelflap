@@ -1,44 +1,156 @@
-<!--
-  =============================================================================
-  [AI REQUIREMENT]: Always increment/bump the file version number whenever 
-  any modifications or updates are made to this file.
-  =============================================================================
-  PixelJump / Flappy Bird Web App
-  Version: v1.16.0
-  Description: Modernized kids HTML structural shell with responsive canvas.
--->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <!--
+    Viewport is locked to device width with no pinch-zoom so the game
+    behaves like a native app on phones/tablets. `viewport-fit=cover`
+    lets us pad around iPhone notches/home-indicators via CSS safe-area
+    variables in style.css.
+  -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>PixelJump - Kids Arcade - v1.16.0</title>
+  <meta name="theme-color" content="#3fc7ff">
+  <meta name="description" content="PixelJump - a bright, bouncy flap-and-dodge adventure for kids!">
+  <title>PixelJump - v2.0.0</title>
 
-  <!-- Google Fonts for Kids Modern Vibrant Theme -->
+  <!--
+    =====================================================================
+    AI / DEVELOPER EDITING REQUIREMENT
+    =====================================================================
+    Any assistant or developer that edits THIS FILE must bump the version
+    in TWO places every time a change is made:
+      1. The <title> tag above            (e.g. "PixelJump - v2.0.1")
+      2. The game.js "?v=" query string    (bottom of this file)
+    Use semantic versioning (MAJOR.MINOR.PATCH):
+      - PATCH -> tiny fixes / copy tweaks / comment-only edits
+      - MINOR -> new visuals, new UI, non-breaking features
+      - MAJOR -> structural rewrites / breaking changes
+    Bumping the query string forces browsers to fetch the new game.js
+    instead of serving a stale cached copy.
+    =====================================================================
+  -->
+
+  <!-- Game favicon: rounded app-icon style badge -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%230ea5e9'/><circle cx='50' cy='46' r='30' fill='%23ffd54f'/><text x='50' y='60' font-size='40' text-anchor='middle'>🐱</text></svg>">
+
+  <!--
+    Kid-friendly, rounded Google Fonts:
+    - "Baloo 2"  -> bold, bubbly display face for titles/buttons
+    - "Nunito"   -> soft, highly-legible rounded body face for UI text
+    Both are free/open license fonts loaded from Google Fonts CDN.
+  -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Game Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=1.16.0">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%2338bdf8'/><text x='50' y='70' font-size='60' text-anchor='middle'>🚀</text></svg>">
+  <link rel="stylesheet" href="style.css?v=2.0.0">
 </head>
 <body>
 
-  <!-- Responsive Screen Wrapper for Universal Display Scaling -->
+  <!-- ================================================================
+       #game-container holds the gameplay canvas plus every DOM overlay
+       screen (splash / game-over / info modal). Overlays are real HTML
+       so text stays crisp on any screen and layout reflows naturally
+       instead of relying on hand-placed pixel coordinates.
+  ================================================================= -->
   <div id="game-container">
-    <canvas id="gameCanvas" width="450" height="750"></canvas>
+
+    <!-- Gameplay layer: pipes, player, particles, and the live score HUD
+         are drawn here every frame. Sized in JS to fill the container
+         edge-to-edge on any display (see game.js -> resizeCanvas). -->
+    <canvas id="gameCanvas" aria-label="PixelJump game canvas"></canvas>
+
+    <!-- ============================================================
+         SPLASH / START SCREEN
+    ============================================================= -->
+    <section id="splash-screen" class="overlay" aria-label="Start screen">
+      <!-- Purely decorative floating background elements (sun, clouds, stars) -->
+      <div class="sky-decor" aria-hidden="true">
+        <span class="decor sun">☀️</span>
+        <span class="decor cloud cloud-a">☁️</span>
+        <span class="decor cloud cloud-b">☁️</span>
+        <span class="decor star star-a">⭐</span>
+        <span class="decor star star-b">✨</span>
+        <span class="decor star star-c">🌟</span>
+      </div>
+
+      <div class="splash-content">
+        <h1 class="title" id="splashTitle">PIXEL JUMP</h1>
+        <p class="subtitle">Flap, dodge &amp; collect your way to the top!</p>
+
+        <div class="input-group">
+          <label for="initialsInput">Your name (1-3 letters)</label>
+          <input type="text" id="initialsInput" maxlength="3" placeholder="ACE" autocomplete="off" spellcheck="false" inputmode="text">
+        </div>
+
+        <div class="input-group">
+          <label id="avatarLabel">Pick your character</label>
+          <div class="avatar-selector" id="avatarSelector" role="listbox" aria-labelledby="avatarLabel">
+            <!-- Avatar buttons are generated in game.js from the AVATARS list,
+                 plus one "upload your own photo" button appended at the end. -->
+          </div>
+        </div>
+
+        <div class="leaderboard-box" id="splashLeaderboardBox">
+          <h3>🏆 Top 15 Hall of Fame 🏆</h3>
+          <p class="leaderboard-status" id="splashLeaderboardStatus">Loading scores…</p>
+          <ul class="leaderboard-list" id="splashLeaderboardList"></ul>
+        </div>
+
+        <div class="btn-row">
+          <button type="button" class="btn secondary-btn" id="howToPlayBtn">🧭 How to Play</button>
+          <button type="button" class="btn primary-btn bounce-hover" id="startGameBtn">▶ Start Game</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         GAME OVER SCREEN
+    ============================================================= -->
+    <section id="game-over-screen" class="overlay hidden" aria-label="Game over screen">
+      <div class="splash-content">
+        <h1 class="title title-gameover">GAME OVER</h1>
+        <p id="final-score">Score: 0</p>
+
+        <div class="leaderboard-box" id="gameOverLeaderboardBox">
+          <h3>🏅 Top 15 Leaderboard 🏅</h3>
+          <p class="leaderboard-status" id="gameOverLeaderboardStatus">Loading scores…</p>
+          <ul class="leaderboard-list" id="gameOverLeaderboardList"></ul>
+        </div>
+
+        <div class="btn-row">
+          <button type="button" class="btn secondary-btn" id="muteBtn">🔊 Audio: On</button>
+          <button type="button" class="btn secondary-btn" id="customAvatarBtn">📁 Custom Avatar</button>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn secondary-btn" id="homeBtn">🏠 Home</button>
+          <button type="button" class="btn primary-btn bounce-hover" id="playAgainBtn">🎮 Play Again</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         "HOW TO PLAY" INFO MODAL
+    ============================================================= -->
+    <section id="info-modal" class="overlay hidden" aria-label="How to play">
+      <div class="splash-content modal-content">
+        <h2 class="modal-title">⚔️ Power-Ups &amp; Guide 🛡️</h2>
+        <div class="info-grid" id="infoGrid">
+          <!-- Populated from game.js so the guide text always matches
+               the actual gameplay values (durations, bonus points, etc). -->
+        </div>
+        <button type="button" class="btn primary-btn" id="closeInfoBtn">Got it!</button>
+      </div>
+    </section>
+
   </div>
 
-  <!-- Hidden Custom Avatar File Uploader -->
-  <input type="file" id="avatarUpload" accept="image/*">
+  <!-- Hidden native file input used for uploading a custom avatar photo -->
+  <input type="file" id="avatarUpload" accept="image/*" aria-hidden="true">
 
-  <!-- Core Game Script -->
-  <script src="game.js?v=1.16.0"></script>
+  <script src="game.js?v=2.0.0"></script>
 </body>
 </html>

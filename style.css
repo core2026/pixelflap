@@ -1,64 +1,465 @@
-/**
- * =============================================================================
- * [AI REQUIREMENT]: Always increment/bump the file version number whenever 
- * any modifications or updates are made to this file.
- * =============================================================================
- * PixelJump Modern Kids Theme & Responsive Layout Engine
- * Version: v1.16.0
- */
+/* =========================================================================
+   PixelJump Stylesheet
+   Version: 2.0.0
 
-/* Resets & Touch Behavior Optimization */
+   AI / DEVELOPER EDITING REQUIREMENT:
+   Any assistant or developer who edits this file MUST bump the version
+   number above AND the "?v=" query string on the <link> tag that loads
+   this file in index.html, using semantic versioning (MAJOR.MINOR.PATCH).
+   ========================================================================= */
+
+/* -------------------------------------------------------------------------
+   Design tokens: the kid-arcade color palette + fonts used everywhere.
+   Keeping these as CSS variables means the whole theme can be re-colored
+   from one place.
+------------------------------------------------------------------------- */
+:root {
+  --sky-top: #3fc7ff;
+  --sky-bottom: #8fe3ff;
+  --sun-yellow: #ffd54f;
+  --candy-pink: #ff6fa5;
+  --grass-green: #52d17c;
+  --grape-purple: #7b5cff;
+  --ink: #2b2350;              /* main text color, deep playful plum */
+  --card-bg: #ffffff;
+  --card-border: #ffe27a;
+  --shadow-soft: 0 10px 24px rgba(43, 35, 80, 0.18);
+  --font-display: 'Baloo 2', 'Segoe UI', sans-serif;
+  --font-body: 'Nunito', 'Segoe UI', sans-serif;
+  /* Safe-area insets keep UI clear of notches / home indicators */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
+  touch-action: manipulation;
 }
 
-/* Full Viewport Canvas Anchor with Modern Kid-Friendly Palette */
 html, body {
   width: 100%;
   height: 100%;
-  background-color: #0f172a;
-  background-image: radial-gradient(#3b82f6 1px, transparent 1px), radial-gradient(#8b5cf6 1px, #0f172a 1px);
-  background-size: 40px 40px;
-  background-position: 0 0, 20px 20px;
-  color: #ffffff;
-  font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: hidden;
+  background: #041022;
+  font-family: var(--font-body);
+  color: var(--ink);
 }
 
-/* Dynamic Aspect-Ratio Main Container to Scale Flawlessly Across Displays */
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /* dvh = dynamic viewport height, avoids the mobile-browser address-bar
+     jump you get with plain vh */
+  min-height: 100dvh;
+}
+
+/* -------------------------------------------------------------------------
+   #game-container: fills the whole viewport edge-to-edge on every device.
+   No max-width/letterboxing — the canvas inside is resized in JS to
+   exactly match this box, so gameplay uses all available screen space.
+------------------------------------------------------------------------- */
 #game-container {
   position: relative;
   width: 100vw;
-  height: 100vh;
-  max-width: 500px;
-  max-height: 888px;
+  height: 100dvh;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-bottom) 100%);
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+input[type="file"] {
+  display: none;
+}
+
+/* =========================================================================
+   OVERLAY SCREENS (splash / game-over / info modal)
+   Real HTML on top of the canvas so text is always crisp and layout
+   reflows automatically with flexbox instead of manual pixel math.
+   ========================================================================= */
+.overlay {
+  position: absolute;
+  inset: 0;
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-  border-radius: 24px;
-  overflow: hidden;
-  border: 4px solid #38bdf8;
+  padding: max(16px, var(--safe-top)) max(16px, var(--safe-right)) max(16px, var(--safe-bottom)) max(16px, var(--safe-left));
+  background: linear-gradient(180deg, #3fc7ff 0%, #8fe3ff 55%, #bff2c2 100%);
+  overflow-y: auto;
+  z-index: 10;
+  animation: fadeIn 0.25s ease;
 }
 
-/* HTML5 Canvas Scaling Setup */
-canvas {
+#info-modal {
+  z-index: 20;
+  background: rgba(20, 20, 45, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.hidden {
+  display: none !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Decorative sky elements behind the splash content */
+.sky-decor {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.decor {
+  position: absolute;
+  font-size: clamp(28px, 6vw, 52px);
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.15));
+}
+.sun { top: 4%; right: 8%; font-size: clamp(40px, 9vw, 80px); animation: spin 18s linear infinite; }
+.cloud-a { top: 10%; left: 6%; animation: floatX 14s ease-in-out infinite; }
+.cloud-b { top: 22%; right: 12%; animation: floatX 16s ease-in-out infinite reverse; }
+.star-a { top: 65%; left: 8%; animation: twinkle 3s ease-in-out infinite; }
+.star-b { top: 15%; left: 40%; animation: twinkle 2.4s ease-in-out infinite 0.5s; }
+.star-c { bottom: 8%; right: 10%; animation: twinkle 2.8s ease-in-out infinite 1s; }
+
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes floatX { 0%,100% { transform: translateX(0); } 50% { transform: translateX(18px); } }
+@keyframes twinkle { 0%,100% { opacity: 0.4; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.15); } }
+
+/* -------------------------------------------------------------------------
+   Splash content card
+------------------------------------------------------------------------- */
+.splash-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(2rem, 9vw, 3.2rem);
+  letter-spacing: 1px;
+  text-align: center;
+  color: #fff;
+  -webkit-text-stroke: 2px var(--grape-purple);
+  text-shadow: 0 6px 0 var(--grape-purple), 0 10px 18px rgba(43,35,80,0.35);
+  animation: wiggle 3.2s ease-in-out infinite;
+}
+
+.title-gameover {
+  -webkit-text-stroke: 2px #c2185b;
+  text-shadow: 0 6px 0 #c2185b, 0 10px 18px rgba(43,35,80,0.35);
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+
+.subtitle {
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.25);
+  text-align: center;
+  font-size: clamp(0.85rem, 3vw, 1rem);
+  margin-top: -8px;
+}
+
+/* -------------------------------------------------------------------------
+   Form controls
+------------------------------------------------------------------------- */
+.input-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.input-group label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-align: center;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 3px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  outline: none;
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+input[type="text"]:focus {
+  transform: scale(1.03);
+  border-color: var(--candy-pink);
+  box-shadow: 0 0 0 4px rgba(255, 111, 165, 0.35), var(--shadow-soft);
+}
+
+input[type="text"].invalid {
+  border-color: #ff1744 !important;
+  box-shadow: 0 0 0 4px rgba(255, 23, 68, 0.35) !important;
+}
+
+/* Avatar picker: horizontally scrollable row of round emoji buttons */
+.avatar-selector {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 6px 4px 10px;
+  scroll-snap-type: x proximity;
+  width: 100%;
+  justify-content: flex-start;
+}
+.avatar-selector::-webkit-scrollbar { height: 6px; }
+.avatar-selector::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.6); border-radius: 4px; }
+
+.avatar-btn {
+  scroll-snap-align: center;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  font-size: 1.7rem;
+  background: var(--card-bg);
+  border: 3px solid var(--card-border);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.avatar-btn span, .avatar-btn img {
+  pointer-events: none;
   width: 100%;
   height: 100%;
-  display: block;
-  object-fit: contain;
-  background-color: #38bdf8;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  object-fit: cover;
 }
 
-/* Hidden File Upload Controller */
-input[type="file"] {
-  display: none;
+.avatar-btn.active {
+  border-color: var(--candy-pink);
+  transform: scale(1.15);
+  box-shadow: 0 0 0 4px rgba(255, 111, 165, 0.35), var(--shadow-soft);
+}
+
+.avatar-btn:hover { transform: scale(1.08); }
+
+.avatar-btn.upload-btn {
+  background: var(--grass-green);
+  color: #fff;
+  border-color: #2fa956;
+}
+
+/* -------------------------------------------------------------------------
+   Leaderboard card
+------------------------------------------------------------------------- */
+.leaderboard-box {
+  width: 100%;
+  max-height: 180px;
+  background: var(--card-bg);
+  border-radius: 18px;
+  padding: 12px;
+  border: 3px solid var(--card-border);
+  box-shadow: var(--shadow-soft);
+  overflow-y: auto;
+}
+
+.leaderboard-box h3 {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  color: var(--grape-purple);
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.leaderboard-status {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.leaderboard-list {
+  list-style: none;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.leaderboard-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 8px;
+  border-bottom: 1px dashed rgba(43, 35, 80, 0.12);
+}
+
+.leaderboard-list li:nth-child(even) {
+  background: rgba(255, 213, 79, 0.15);
+  border-radius: 8px;
+}
+
+.rank-badge {
+  display: inline-block;
+  width: 22px;
+  text-align: center;
+  margin-right: 6px;
+}
+
+.score-date { display: flex; align-items: center; gap: 8px; }
+.time-stamp { font-size: 0.65rem; color: #999; font-weight: 600; }
+.score-val { color: var(--candy-pink); }
+
+/* -------------------------------------------------------------------------
+   Buttons
+------------------------------------------------------------------------- */
+.btn-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.btn {
+  flex: 1;
+  padding: 14px 10px;
+  border: none;
+  border-radius: 16px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(0.85rem, 3vw, 1rem);
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.btn:active { transform: translateY(2px) scale(0.98); }
+
+.primary-btn {
+  background: linear-gradient(180deg, var(--candy-pink), #ff4f91);
+  color: #fff;
+}
+
+.secondary-btn {
+  background: #fff;
+  color: var(--grape-purple);
+  border: 3px solid var(--card-border);
+}
+
+.bounce-hover:hover { animation: bounce 0.5s ease infinite; }
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* -------------------------------------------------------------------------
+   Info / "How to Play" modal
+------------------------------------------------------------------------- */
+.modal-content {
+  background: var(--card-bg);
+  border-radius: 24px;
+  padding: 20px;
+  border: 4px solid var(--card-border);
+}
+
+.modal-title {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--grape-purple);
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff7e0;
+  padding: 10px;
+  border-radius: 12px;
+  border: 2px solid var(--card-border);
+}
+
+.info-item span.icon { font-size: 1.4rem; }
+.info-item div { display: flex; flex-direction: column; }
+.info-item strong { color: var(--ink); font-size: 0.82rem; }
+.info-item small { color: var(--candy-pink); font-size: 0.7rem; font-weight: 700; }
+
+#final-score {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  color: var(--grape-purple);
+  background: #fff;
+  padding: 8px 18px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-soft);
+}
+
+.shake { animation: shakeAnim 0.3s ease-in-out; }
+@keyframes shakeAnim {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-6px, 4px); }
+  40% { transform: translate(6px, -4px); }
+  60% { transform: translate(-4px, 2px); }
+  80% { transform: translate(4px, -2px); }
+  100% { transform: translate(0, 0); }
+}
+
+/* -------------------------------------------------------------------------
+   Small phones: tighten spacing so everything still fits without scrolling
+------------------------------------------------------------------------- */
+@media (max-height: 700px) {
+  .leaderboard-box { max-height: 120px; }
+  .splash-content { gap: 8px; }
+}
+
+/* Large / desktop screens: cap width so the card doesn't stretch too wide */
+@media (min-width: 900px) {
+  .splash-content { max-width: 480px; }
 }
