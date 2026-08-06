@@ -22,13 +22,13 @@ export default {
     }
 
     try {
-      // 2. GET /api/leaderboard - Fetch Top 15 Scores
+      // 2. GET /api/leaderboard - Fetch Top 15 Scores with ISO Timestamps
       if (request.method === "GET" && url.pathname === "/api/leaderboard") {
         const { results } = await env.DB.prepare(
           `SELECT 
             player_name, 
             score, 
-            COALESCE(created_at, CURRENT_TIMESTAMP) AS created_at 
+            strftime('%Y-%m-%dT%H:%M:%SZ', COALESCE(created_at, CURRENT_TIMESTAMP)) AS created_at 
            FROM leaderboard 
            ORDER BY score DESC 
            LIMIT 15`

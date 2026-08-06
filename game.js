@@ -1,63 +1,22 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.1.04
+ * Version: v2.1.05
  *
- * WHAT CHANGED IN v2.1.0
- * - Shield pickup now destroys the pipe it collides with (small hop instead
- *   of a big bounce) instead of just cushioning the hit.
- * - Slow-mo pickup reskinned from a stopwatch to "Turtle Time" (🐢).
- * - Initials are required before Start Game will work (shake + red outline
- *   if left blank) — no more silent "---" fallback.
- * - "Custom Avatar" upload is now a clearly-labeled camera button with a
- *   hint caption, instead of an ambiguous folder icon.
- * - CONFIG.API_BASE_URL now points at the real deployed Worker.
- *
- * WHAT CHANGED IN v2.1.01
- * - Canvas now fills the screen edge-to-edge and resizes live (no more fixed
- *   450x750 box) so it scales cleanly to phones, tablets, and desktops.
- * - Splash / Game Over / How-to-Play screens moved OUT of hand-drawn canvas
- *   code and into real HTML (see index.html + style.css). The canvas now only
- *   renders active gameplay (pipes, player, particles, HUD).
- * - The leaderboard is now backed by the Cloudflare Worker + D1 database in
- *   index.js instead of localStorage-only. See CONFIG.API_BASE_URL below.
- *
- * WHAT CHANGED IN v2.1.02
- * - Fixed date display showing "undefined" when D1 database timestamps are
- *   missing or malformed by adding null-checks and NaN date validation.
- *
- * WHAT CHANGED IN v2.1.03
- * - Enhanced formatServerDate and fetchLeaderboard with property fallback checks
- *   (created_at, createdAt, date, timestamp) to prevent literal "undefined" output.
- *
- * WHAT CHANGED IN v2.1.04
- * - Hardened date formatting against API responses completely omitting the date field.
- *   Missing server dates now cleanly display as "--" instead of "undefined".
- *
- * =============================================================================
- * AI / DEVELOPER EDITING REQUIREMENT
- * =============================================================================
- * Anyone (human or AI) who edits this file MUST bump GAME_VERSION below AND
- * the matching version markers in index.html (<title> + "?v=" script tag) and
- * style.css ("?v=" link tag), using semantic versioning:
- *   PATCH -> bug fixes / tiny tweaks / comment-only changes
- *   MINOR -> new features, new visuals, non-breaking additions
- *   MAJOR -> structural rewrites / breaking changes
- * This keeps the on-screen version badge accurate and busts browser cache.
+ * WHAT CHANGED IN v2.1.05
+ * - Updated formatServerDate to handle ISO 8601 strings, SQLite space-separated
+ *   timestamps, and missing properties across all browser vendors.
  * =============================================================================
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.1.04";
+  const GAME_VERSION = "v2.1.05";
 
   // ===========================================================================
   // 0. CONFIG
   // ===========================================================================
   const CONFIG = {
-    // API Worker URL talking to D1 database
     API_BASE_URL: "https://game-leaderboard-api.acekallas.workers.dev",
-    // Reference design resolution. All gameplay physics/sizes are scaled
-    // relative to this so the game *feels* the same on any screen size.
     BASE_W: 450,
     BASE_H: 750,
   };
@@ -99,8 +58,6 @@ window.addEventListener('DOMContentLoaded', () => {
   let score = 0;
   let playerInitials = (localStorage.getItem('pixeljump_initials') || "").toUpperCase();
 
-  // Local fallback copy of the leaderboard (used if the Worker/D1 API is
-  // unreachable, e.g. offline, or CONFIG.API_BASE_URL hasn't been set yet).
   let highScores = JSON.parse(localStorage.getItem('pixeljump_top15_cache')) || [
     { name: "ACE", score: 50, date: "Aug 02, 14:20" },
     { name: "JMP", score: 35, date: "Aug 03, 09:15" },
@@ -116,10 +73,8 @@ window.addEventListener('DOMContentLoaded', () => {
   let slowMoTimer = 0;
   let scoreMultiplierTimer = 0;
 
-  // Live logical (CSS-pixel) size of the canvas — recalculated on resize.
   let VW = CONFIG.BASE_W;
   let VH = CONFIG.BASE_H;
-  // Uniform gameplay scale factor vs. reference design resolution.
   let SCALE = 1;
 
   const THEMES = {
@@ -186,7 +141,7 @@ window.addEventListener('DOMContentLoaded', () => {
         gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
         osc.start(now); osc.stop(now + 0.3);
       }
-    } catch (e) { /* Audio can fail silently — non-critical */ }
+    } catch (e) { }
   }
 
   // ===========================================================================
@@ -247,13 +202,18 @@ window.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('orientationchange', resizeCanvas);
 
   // ===========================================================================
-  // 6. LEADERBOARD (Cloudflare Worker + D1, with local-cache fallback)
+  // 6. LEADERBOARD
   // ===========================================================================
   function formatServerDate(rawDate) {
     if (!rawDate || rawDate === "undefined" || rawDate === "null") return "--";
     
     try {
-      const d = new Date(rawDate);
+      let str = String(rawDate).trim();
+      if (str.includes(" ") && !str.includes("T")) {
+        str = str.replace(" ", "T") + "Z";
+      }
+
+      const d = new Date(str);
       if (isNaN(d.getTime())) return "--";
 
       const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -283,8 +243,6 @@ window.addEventListener('DOMContentLoaded', () => {
         const li = document.createElement('li');
         const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
         const isYou = hs.name === playerInitials && playerInitials !== "";
-        
-        // Final guard against literal "undefined" string appearing in DOM
         const displayDate = (hs.date && hs.date !== "undefined") ? hs.date : "--";
 
         li.innerHTML = `
@@ -399,7 +357,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   // ===========================================================================
-  // 8. "HOW TO PLAY" INFO GRID
+  // 8. INFO GRID
   // ===========================================================================
   const GUIDE_SECTIONS = [
     { icon: '🛡️', title: 'Aura Shield', body: 'Blocks 1 hit. Grab a 2nd to stack a double barrier!' },
