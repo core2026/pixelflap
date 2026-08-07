@@ -1,7 +1,27 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.4.00
+ * Version: v2.5.01
+ *
+ * WHAT CHANGED IN v2.5.01
+ * - Fixed pickup icons being drawn with the default (alphabetic) text
+ *   baseline, which anchors differently per-glyph — on iPadOS the shield
+ *   emoji rendered noticeably taller than the others and could clip against
+ *   the canvas edge. Icons are now centered on their own bounding box.
+ * - Lowered the Turtle Time (slow-mo) drop rate — it was showing up too often.
+ *
+ * WHAT CHANGED IN v2.5.00
+ * - Near-miss "close call" bonus: skim past a pipe without touching it and
+ *   bank a growing bonus for chaining close calls.
+ * - Magnet power-up: pulls nearby items toward the player for a few seconds.
+ * - Mini Mode power-up: temporarily shrinks the player to slip through
+ *   tight gaps (player position now tracked from its center so this scales
+ *   symmetrically).
+ * - Lucky Feather power-up: saves you from one otherwise-fatal hit, once.
+ * - Coins: a simple persistent currency (saved per-device via
+ *   localStorage) shown on the splash screen and tallied after each run.
+ * - Game-over screen now shows an easy-to-scan stats panel (personal best,
+ *   pipes cleared, best streaks, coins earned) right next to the score.
  *
  * WHAT CHANGED IN v2.4.00
  * - Rare golden pipes: still fly through the gap, but clearing one banks a
@@ -29,7 +49,7 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.4.00";
+  const GAME_VERSION = "v2.5.01";
 
   // ===========================================================================
   // 0. CONFIG
@@ -56,6 +76,12 @@ window.addEventListener('DOMContentLoaded', () => {
   const initialsInput = document.getElementById('initialsInput');
   const avatarSelector = document.getElementById('avatarSelector');
   const finalScoreEl = document.getElementById('final-score');
+  const totalCoinsDisplay = document.getElementById('totalCoinsDisplay');
+  const statBestEl = document.getElementById('statBest');
+  const statPipesEl = document.getElementById('statPipes');
+  const statSwordStreakEl = document.getElementById('statSwordStreak');
+  const statGrazeStreakEl = document.getElementById('statGrazeStreak');
+  const statCoinsEl = document.getElementById('statCoins');
 
   const splashLeaderboardList = document.getElementById('splashLeaderboardList');
   const splashLeaderboardStatus = document.getElementById('splashLeaderboardStatus');
@@ -93,6 +119,21 @@ window.addEventListener('DOMContentLoaded', () => {
   let scoreMultiplierTimer = 0;
   let swordStreak = 0;
   let swordStreakFlashTimer = 0;
+  let magnetTimer = 0;
+  let shrinkTimer = 0;
+  let hasFeather = false;
+
+  // Grazes: flying close past a pipe without touching it
+  let grazeStreak = 0;
+  let bestGrazeStreak = 0;
+  let bestSwordStreak = 0;
+  let pipesClearedThisRun = 0;
+
+  // Persistent, per-device progress (localStorage — see note in chat about
+  // this not syncing across devices without a real account system).
+  let totalCoins = parseInt(localStorage.getItem('pixeljump_total_coins'), 10) || 0;
+  let coinsThisRun = 0;
+  let personalBest = parseInt(localStorage.getItem('pixeljump_personal_best'), 10) || 0;
 
   let VW = CONFIG.BASE_W;
   let VH = CONFIG.BASE_H;
@@ -238,6 +279,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
   const player = {
     x: 90, y: 300, width: 38, height: 38, vy: 0,
+    baseWidth: 38, baseHeight: 38,
+    cx: 90 + 19, cy: 300 + 19, // center point — the source of truth for position
     gravity: 0.36, jumpStrength: -7.2,
     shieldCount: 1,
     inventory: { sword: false, swordCharges: 0 }
@@ -270,8 +313,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
     player.gravity = 0.36 * SCALE;
     player.jumpStrength = -7.2 * SCALE;
-    player.width = 38 * SCALE;
-    player.height = 38 * SCALE;
+    player.baseWidth = 38 * SCALE;
+    player.baseHeight = 38 * SCALE;
+    const sizeMult = shrinkTimer > 0 ? 0.62 : 1;
+    player.width = player.baseWidth * sizeMult;
+    player.height = player.baseHeight * sizeMult;
+    player.x = player.cx - player.width / 2;
+    player.y = player.cy - player.height / 2;
 
     clouds.forEach(c => { c.x = c.fx * VW; c.y = c.fy * VH; });
   }
@@ -443,6 +491,11 @@ window.addEventListener('DOMContentLoaded', () => {
     { icon: '⚔️', title: 'Spinning Sword', body: 'Orbiting blades slice any pipe you touch! Combine with a Shield for a surprise!' },
     { icon: '🔥', title: 'Sword Streak', body: 'Slice pipes back-to-back without getting hit for a +10 bonus every 5!' },
     { icon: '✨', title: 'Golden Pipe', body: 'Rare gold pipes bank a +5 bonus when you clear them!' },
+    { icon: '😅', title: 'Close Calls', body: 'Skim past a pipe without touching it for a near-miss bonus that grows!' },
+    { icon: '🧲', title: 'Magnet', body: 'Pulls nearby coins and power-ups straight to you!' },
+    { icon: '🤏', title: 'Mini Mode', body: 'Shrinks you down to slip through tight gaps!' },
+    { icon: '🪶', title: 'Lucky Feather', body: "Saves you from one otherwise-fatal hit. Only holds one at a time!" },
+    { icon: '🪙', title: 'Coins', body: 'Collect coins to grow your all-time total, shown on the start screen!' },
     { icon: '🛡️+⚔️', title: "Knight's Rampage", body: 'Smashes 6 pipes in a row for +50 points!' },
   ];
 
@@ -560,10 +613,30 @@ window.addEventListener('DOMContentLoaded', () => {
   // ===========================================================================
   // 11. GAMEPLAY LOGIC
   // ===========================================================================
+  const ITEM_WEIGHTS = [
+    { type: 'coin', weight: 34 },
+    { type: 'shield', weight: 14 },
+    { type: 'sword', weight: 14 },
+    { type: 'slow', weight: 4 },
+    { type: 'gem', weight: 10 },
+    { type: 'magnet', weight: 8 },
+    { type: 'shrink', weight: 6 },
+    { type: 'feather', weight: 4 },
+  ];
+  const ITEM_WEIGHT_TOTAL = ITEM_WEIGHTS.reduce((sum, w) => sum + w.weight, 0);
+
+  function pickItemType() {
+    let roll = Math.random() * ITEM_WEIGHT_TOTAL;
+    for (const entry of ITEM_WEIGHTS) {
+      if (roll < entry.weight) return entry.type;
+      roll -= entry.weight;
+    }
+    return 'coin';
+  }
+
   function spawnItem(pipeX, topHeight, gap) {
-    if (Math.random() < 0.45) {
-      const rand = Math.random();
-      let type = rand < 0.3 ? 'shield' : rand < 0.55 ? 'sword' : rand < 0.8 ? 'slow' : 'gem';
+    if (Math.random() < 0.55) {
+      const type = pickItemType();
       const safeY = topHeight + (gap / 2) - 10;
       items.push({ type, x: pipeX + 18 * SCALE, y: safeY, size: 26 * SCALE, collected: false });
     }
@@ -590,6 +663,24 @@ window.addEventListener('DOMContentLoaded', () => {
     } else if (type === 'gem') {
       scoreMultiplierTimer = 360;
       spawnFloatingText("💎 2X POINTS!", player.x, player.y - 15, "#c084fc");
+    } else if (type === 'coin') {
+      coinsThisRun++;
+      score += 1;
+      spawnFloatingText("🪙 +1 COIN", player.x, player.y - 15, "#fbbf24");
+    } else if (type === 'magnet') {
+      magnetTimer = 420;
+      spawnFloatingText("🧲 MAGNET ON!", player.x, player.y - 15, "#38bdf8");
+    } else if (type === 'shrink') {
+      shrinkTimer = 360;
+      spawnFloatingText("🤏 MINI MODE!", player.x, player.y - 15, "#a855f7");
+    } else if (type === 'feather') {
+      if (!hasFeather) {
+        hasFeather = true;
+        spawnFloatingText("🪶 FEATHER READY!", player.x, player.y - 15, "#fde68a");
+      } else {
+        score += 5;
+        spawnFloatingText("MAX FEATHER (+5 PTS)", player.x, player.y - 15, "#fde68a");
+      }
     }
     if (player.shieldCount > 0 && player.inventory.sword) triggerGiantShieldCombo();
   }
@@ -653,6 +744,8 @@ window.addEventListener('DOMContentLoaded', () => {
     if (slowMoTimer > 0) slowMoTimer--;
     if (scoreMultiplierTimer > 0) scoreMultiplierTimer--;
     if (swordStreakFlashTimer > 0) swordStreakFlashTimer--;
+    if (magnetTimer > 0) magnetTimer--;
+    if (shrinkTimer > 0) shrinkTimer--;
 
     const currentSpeed = (slowMoTimer > 0 ? 1.1 : 2.2) * SCALE;
 
@@ -667,7 +760,12 @@ window.addEventListener('DOMContentLoaded', () => {
     });
 
     player.vy += player.gravity;
-    player.y += player.vy;
+    player.cy += player.vy;
+    const sizeMult = shrinkTimer > 0 ? 0.62 : 1;
+    player.width = player.baseWidth * sizeMult;
+    player.height = player.baseHeight * sizeMult;
+    player.x = player.cx - player.width / 2;
+    player.y = player.cy - player.height / 2;
     if (player.y + player.height >= VH || player.y <= 0) handlePlayerHit();
 
     const pipeSpawnInterval = (slowMoTimer > 0) ? 220 : 110;
@@ -688,6 +786,17 @@ window.addEventListener('DOMContentLoaded', () => {
     for (let i = items.length - 1; i >= 0; i--) {
       const item = items[i];
       item.x -= currentSpeed;
+      if (magnetTimer > 0 && !item.collected) {
+        const dx = player.cx - item.x;
+        const dy = player.cy - item.y;
+        const dist = Math.hypot(dx, dy);
+        const magnetRadius = 190 * SCALE;
+        if (dist < magnetRadius && dist > 1) {
+          const pull = 5 * SCALE;
+          item.x += (dx / dist) * pull;
+          item.y += (dy / dist) * pull;
+        }
+      }
       if (!item.collected && player.x < item.x + item.size && player.x + player.width > item.x &&
           player.y < item.y + item.size && player.y + player.height > item.y) {
         item.collected = true;
@@ -703,14 +812,32 @@ window.addEventListener('DOMContentLoaded', () => {
       const pipe = pipes[i];
       pipe.x -= currentSpeed;
 
+      // Track how close the player skimmed this pipe while horizontally
+      // overlapping it, so a genuine near-miss can be rewarded on pass.
+      if (!pipe.shattered && player.x + player.width > pipe.x && player.x < pipe.x + pipe.width) {
+        const topGap = player.y - pipe.topHeight;
+        const bottomGap = pipe.bottomY - (player.y + player.height);
+        const gap = Math.min(topGap, bottomGap);
+        if (pipe.grazeMin === undefined || gap < pipe.grazeMin) pipe.grazeMin = gap;
+      }
+
       if (!pipe.passed && pipe.x + pipe.width < player.x) {
         pipe.passed = true;
+        pipesClearedThisRun++;
         const addScore = (scoreMultiplierTimer > 0) ? 2 : 1;
         score += addScore;
         if (scoreMultiplierTimer > 0) spawnFloatingText("+2 PTS 💎", player.x, player.y - 20, "#c084fc");
         if (pipe.golden) {
           score += 5;
           spawnFloatingText("✨ GOLDEN PIPE +5!", player.x, player.y - 38, "#fde047");
+        }
+        const grazeThreshold = 14 * SCALE;
+        if (!pipe.shattered && pipe.grazeMin !== undefined && pipe.grazeMin >= 0 && pipe.grazeMin < grazeThreshold) {
+          grazeStreak++;
+          if (grazeStreak > bestGrazeStreak) bestGrazeStreak = grazeStreak;
+          const bonus = 2 + Math.floor(grazeStreak / 3);
+          score += bonus;
+          spawnFloatingText(`😅 CLOSE CALL! +${bonus}`, player.x, player.y - 55, "#38bdf8");
         }
       }
 
@@ -737,6 +864,7 @@ window.addEventListener('DOMContentLoaded', () => {
             if (player.inventory.swordCharges <= 0) player.inventory.sword = false;
             score += 3;
             swordStreak++;
+            if (swordStreak > bestSwordStreak) bestSwordStreak = swordStreak;
             swordStreakFlashTimer = 40;
             playSound('shatter');
             createPipeShatterParticles(pipe.x, 0, pipe.width, pipe.topHeight);
@@ -760,6 +888,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function handlePlayerHit(pipe = null) {
     swordStreak = 0;
+    grazeStreak = 0;
     if (player.shieldCount > 0) {
       player.shieldCount--;
       playSound('shatter');
@@ -776,6 +905,16 @@ window.addEventListener('DOMContentLoaded', () => {
         player.vy = player.jumpStrength;
         spawnFloatingText(remText, player.x - 20, player.y - 20, "#10b981");
       }
+    } else if (hasFeather) {
+      hasFeather = false;
+      playSound('item');
+      if (pipe) {
+        pipe.shattered = true;
+        createPipeShatterParticles(pipe.x, 0, pipe.width, pipe.topHeight);
+        createPipeShatterParticles(pipe.x, pipe.bottomY, pipe.width, VH - pipe.bottomY);
+      }
+      player.vy = player.jumpStrength * 1.3;
+      spawnFloatingText("🪶 SAVED BY THE FEATHER!", player.x - 20, player.y - 20, "#fde68a");
     } else {
       endGame();
     }
@@ -934,9 +1073,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
     items.forEach(item => {
       ctx.font = `${24 * SCALE}px sans-serif`;
-      let icon = item.type === 'sword' ? '⚔️' : item.type === 'slow' ? '🐢' : item.type === 'gem' ? '💎' : '🛡️';
-      ctx.fillText(icon, item.x, item.y);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const ICONS = { sword: '⚔️', slow: '🐢', gem: '💎', coin: '🪙', magnet: '🧲', shrink: '🤏', feather: '🪶', shield: '🛡️' };
+      ctx.fillText(ICONS[item.type] || '🛡️', item.x + item.size / 2, item.y + item.size / 2);
     });
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
 
     particles.forEach(p => {
       ctx.save();
@@ -982,6 +1125,18 @@ window.addEventListener('DOMContentLoaded', () => {
       drawSpinningSword(player.x + player.width / 2, player.y + player.height / 2);
     }
 
+    if (magnetTimer > 0) {
+      ctx.save();
+      const pulse = 0.15 + 0.08 * Math.sin(frameCount * 0.15);
+      ctx.globalAlpha = pulse;
+      ctx.beginPath();
+      ctx.arc(player.x + player.width / 2, player.y + player.height / 2, 190 * SCALE, 0, Math.PI * 2);
+      ctx.strokeStyle = "#38bdf8";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    }
+
     floatingTexts.forEach(ft => {
       ctx.save();
       ctx.globalAlpha = Math.max(0, ft.alpha);
@@ -1010,6 +1165,8 @@ window.addEventListener('DOMContentLoaded', () => {
     let invStatus = "Shields: ";
     if (player.shieldCount > 0) invStatus += `🛡️ x${player.shieldCount} `;
     if (player.inventory.sword) invStatus += `⚔️ x${player.inventory.swordCharges} `;
+    if (hasFeather) invStatus += `🪶 `;
+    invStatus += `🪙 ${coinsThisRun}`;
     ctx.font = `${14 * SCALE}px 'Nunito', -apple-system, sans-serif`;
     ctx.fillText(invStatus, pad, hudY);
 
@@ -1023,6 +1180,16 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.fillStyle = "#c084fc";
       ctx.fillText(`💎 2x Points: ${Math.ceil(scoreMultiplierTimer / 60)}s`, pad, hudY);
     }
+    if (magnetTimer > 0) {
+      hudY += 20 * SCALE;
+      ctx.fillStyle = "#38bdf8";
+      ctx.fillText(`🧲 Magnet: ${Math.ceil(magnetTimer / 60)}s`, pad, hudY);
+    }
+    if (shrinkTimer > 0) {
+      hudY += 20 * SCALE;
+      ctx.fillStyle = "#a855f7";
+      ctx.fillText(`🤏 Mini Mode: ${Math.ceil(shrinkTimer / 60)}s`, pad, hudY);
+    }
     if (giantShield.active) {
       hudY += 20 * SCALE;
       ctx.fillStyle = "#10b981";
@@ -1035,6 +1202,12 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.fillStyle = swordStreakFlashTimer > 0 ? "#f97316" : "#facc15";
       ctx.fillText(`🔥 Sword Streak: ${swordStreak}`, pad, hudY);
     }
+    if (grazeStreak > 0) {
+      hudY += 20 * SCALE;
+      ctx.font = `600 ${14 * SCALE}px 'Nunito', -apple-system, sans-serif`;
+      ctx.fillStyle = "#38bdf8";
+      ctx.fillText(`😅 Close-Call Streak: ${grazeStreak}`, pad, hudY);
+    }
   }
 
   // ===========================================================================
@@ -1045,7 +1218,20 @@ window.addEventListener('DOMContentLoaded', () => {
       stopBackgroundMusic();
       playSound('hit');
       gameOver = true;
+
+      totalCoins += coinsThisRun;
+      localStorage.setItem('pixeljump_total_coins', String(totalCoins));
+      updateCoinBadge();
+
+      let isNewBest = false;
+      if (score > personalBest) {
+        personalBest = score;
+        localStorage.setItem('pixeljump_personal_best', String(personalBest));
+        isNewBest = true;
+      }
+
       finalScoreEl.textContent = `Score (${playerInitials || "---"}): ${score} pts`;
+      renderStatsPanel(isNewBest);
       showScreen('gameover');
       gameContainer.classList.add('shake');
       setTimeout(() => gameContainer.classList.remove('shake'), 300);
@@ -1053,8 +1239,20 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function updateCoinBadge() {
+    if (totalCoinsDisplay) totalCoinsDisplay.textContent = totalCoins.toLocaleString();
+  }
+
+  function renderStatsPanel(isNewBest) {
+    if (statBestEl) statBestEl.textContent = `${personalBest}${isNewBest ? ' 🎉 NEW!' : ''}`;
+    if (statPipesEl) statPipesEl.textContent = pipesClearedThisRun;
+    if (statSwordStreakEl) statSwordStreakEl.textContent = bestSwordStreak;
+    if (statGrazeStreakEl) statGrazeStreakEl.textContent = bestGrazeStreak;
+    if (statCoinsEl) statCoinsEl.textContent = `+${coinsThisRun} (Total: ${totalCoins.toLocaleString()})`;
+  }
+
   function resetGame() {
-    player.y = VH * 0.4;
+    player.cy = VH * 0.4 + player.baseHeight / 2;
     player.vy = 0;
     player.shieldCount = 1;
     player.inventory.sword = false;
@@ -1065,6 +1263,14 @@ window.addEventListener('DOMContentLoaded', () => {
     scoreMultiplierTimer = 0;
     swordStreak = 0;
     swordStreakFlashTimer = 0;
+    magnetTimer = 0;
+    shrinkTimer = 0;
+    hasFeather = false;
+    grazeStreak = 0;
+    bestGrazeStreak = 0;
+    bestSwordStreak = 0;
+    pipesClearedThisRun = 0;
+    coinsThisRun = 0;
     score = 0;
     pipes = [];
     items = [];
@@ -1085,11 +1291,14 @@ window.addEventListener('DOMContentLoaded', () => {
   // 14. BOOTSTRAP
   // ===========================================================================
   resizeCanvas();
-  player.x = VW * 0.2;
-  player.y = VH * 0.4;
+  player.cx = VW * 0.2 + player.baseWidth / 2;
+  player.cy = VH * 0.4 + player.baseHeight / 2;
+  player.x = player.cx - player.width / 2;
+  player.y = player.cy - player.height / 2;
   syncInitialsInput();
   buildAvatarSelector();
   buildInfoGrid();
+  updateCoinBadge();
   fetchLeaderboard();
   gameLoop();
 });

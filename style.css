@@ -1,6 +1,6 @@
 /* =========================================================================
    PixelJump Stylesheet
-   Version: v2.1.01
+   Version: v2.2.0
 
    AI / DEVELOPER EDITING REQUIREMENT:
    Any assistant or developer who edits this file MUST bump the version
@@ -471,6 +471,69 @@ input[type="text"].invalid {
   box-shadow: var(--shadow-soft);
 }
 
+/* -------------------------------------------------------------------------
+   Persistent coin badge (splash screen) — saved per-device via localStorage
+------------------------------------------------------------------------- */
+.coin-badge {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #7c4a03;
+  background: linear-gradient(180deg, #fef3c7, #fde68a);
+  border: 3px solid #f59e0b;
+  border-radius: 999px;
+  padding: 6px 18px;
+  box-shadow: var(--shadow-soft);
+  margin-top: -4px;
+}
+
+/* -------------------------------------------------------------------------
+   End-of-run stats panel — sits right under the score so results are easy
+   to scan at a glance alongside the personal best.
+------------------------------------------------------------------------- */
+.stats-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: #fff;
+  border: 2px solid var(--card-border);
+  border-radius: 12px;
+  padding: 8px 6px;
+  box-shadow: var(--shadow-soft);
+}
+
+.stat-item.stat-wide { grid-column: 1 / -1; }
+
+.stat-item.stat-highlight {
+  background: linear-gradient(180deg, #fff7e0, #ffe9a8);
+  border-color: var(--candy-pink);
+}
+
+.stat-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+  opacity: 0.8;
+}
+
+.stat-value {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--grape-purple);
+  text-align: center;
+}
+
 .shake { animation: shakeAnim 0.3s ease-in-out; }
 @keyframes shakeAnim {
   0% { transform: translate(0, 0); }
@@ -487,6 +550,8 @@ input[type="text"].invalid {
 @media (max-height: 700px) {
   .leaderboard-box { max-height: 120px; }
   .splash-content { gap: 8px; }
+  .stat-item { padding: 6px 4px; }
+  .stat-value { font-size: 0.9rem; }
 }
 
 /* Large / desktop screens: cap width so the card doesn't stretch too wide */
