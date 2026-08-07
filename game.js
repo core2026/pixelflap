@@ -1,7 +1,15 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.3.00
+ * Version: v2.4.00
+ *
+ * WHAT CHANGED IN v2.4.00
+ * - Rare golden pipes: still fly through the gap, but clearing one banks a
+ *   +5 point bonus and a sparkle callout.
+ * - Sword-kill streak meter: chaining pipe slices without getting hit builds
+ *   a streak, with a bonus +10 every 5 in a row. Any hit resets it.
+ * - Spinning sword blades now leave a brief golden particle trail as they
+ *   orbit the player.
  *
  * WHAT CHANGED IN v2.3.00
  * - Pipe gaps no longer swing straight from floor to ceiling back-to-back;
@@ -21,7 +29,7 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.3.00";
+  const GAME_VERSION = "v2.4.00";
 
   // ===========================================================================
   // 0. CONFIG
@@ -83,6 +91,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
   let slowMoTimer = 0;
   let scoreMultiplierTimer = 0;
+  let swordStreak = 0;
+  let swordStreakFlashTimer = 0;
 
   let VW = CONFIG.BASE_W;
   let VH = CONFIG.BASE_H;
@@ -431,6 +441,8 @@ window.addEventListener('DOMContentLoaded', () => {
     { icon: '🐢', title: 'Turtle Time', body: 'Everything slows way down for 8 seconds!' },
     { icon: '💎', title: 'Gem Multiplier', body: 'Doubles your points for a while!' },
     { icon: '⚔️', title: 'Spinning Sword', body: 'Orbiting blades slice any pipe you touch! Combine with a Shield for a surprise!' },
+    { icon: '🔥', title: 'Sword Streak', body: 'Slice pipes back-to-back without getting hit for a +10 bonus every 5!' },
+    { icon: '✨', title: 'Golden Pipe', body: 'Rare gold pipes bank a +5 bonus when you clear them!' },
     { icon: '🛡️+⚔️', title: "Knight's Rampage", body: 'Smashes 6 pipes in a row for +50 points!' },
   ];
 
@@ -629,7 +641,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
     const topHeight = Math.round(center - gap / 2);
     const pipeX = VW;
-    pipes.push({ x: pipeX, width: 60 * SCALE, topHeight, bottomY: topHeight + gap, passed: false, shattered: false });
+    const golden = Math.random() < 0.08;
+    pipes.push({ x: pipeX, width: 60 * SCALE, topHeight, bottomY: topHeight + gap, passed: false, shattered: false, golden });
     spawnItem(pipeX, topHeight, gap);
   }
 
@@ -639,6 +652,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     if (slowMoTimer > 0) slowMoTimer--;
     if (scoreMultiplierTimer > 0) scoreMultiplierTimer--;
+    if (swordStreakFlashTimer > 0) swordStreakFlashTimer--;
 
     const currentSpeed = (slowMoTimer > 0 ? 1.1 : 2.2) * SCALE;
 
@@ -694,6 +708,10 @@ window.addEventListener('DOMContentLoaded', () => {
         const addScore = (scoreMultiplierTimer > 0) ? 2 : 1;
         score += addScore;
         if (scoreMultiplierTimer > 0) spawnFloatingText("+2 PTS 💎", player.x, player.y - 20, "#c084fc");
+        if (pipe.golden) {
+          score += 5;
+          spawnFloatingText("✨ GOLDEN PIPE +5!", player.x, player.y - 38, "#fde047");
+        }
       }
 
       if (pipe.shattered) continue;
@@ -718,10 +736,18 @@ window.addEventListener('DOMContentLoaded', () => {
             player.inventory.swordCharges--;
             if (player.inventory.swordCharges <= 0) player.inventory.sword = false;
             score += 3;
+            swordStreak++;
+            swordStreakFlashTimer = 40;
             playSound('shatter');
             createPipeShatterParticles(pipe.x, 0, pipe.width, pipe.topHeight);
             createPipeShatterParticles(pipe.x, pipe.bottomY, pipe.width, VH - pipe.bottomY);
-            spawnFloatingText("⚔️ SLICED! +3", pipe.x, player.y - 20, "#facc15");
+            if (swordStreak > 0 && swordStreak % 5 === 0) {
+              score += 10;
+              playSound('item');
+              spawnFloatingText(`🔥 ${swordStreak} STREAK! +10`, pipe.x, player.y - 40, "#f97316");
+            } else {
+              spawnFloatingText("⚔️ SLICED! +3", pipe.x, player.y - 20, "#facc15");
+            }
           } else {
             handlePlayerHit(pipe);
           }
@@ -733,6 +759,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function handlePlayerHit(pipe = null) {
+    swordStreak = 0;
     if (player.shieldCount > 0) {
       player.shieldCount--;
       playSound('shatter');
@@ -800,10 +827,17 @@ window.addEventListener('DOMContentLoaded', () => {
     const drawShaft = (sx, sy, sh) => {
       if (sh <= 0) return;
       const grad = ctx.createLinearGradient(sx, 0, sx + w, 0);
-      grad.addColorStop(0, currentTheme.pipeAccent);
-      grad.addColorStop(0.45, currentTheme.pipeColor);
-      grad.addColorStop(0.62, currentTheme.pipeHighlight);
-      grad.addColorStop(1, currentTheme.pipeColor);
+      if (pipe.golden) {
+        grad.addColorStop(0, "#b45309");
+        grad.addColorStop(0.45, "#f59e0b");
+        grad.addColorStop(0.62, "#fef3c7");
+        grad.addColorStop(1, "#f59e0b");
+      } else {
+        grad.addColorStop(0, currentTheme.pipeAccent);
+        grad.addColorStop(0.45, currentTheme.pipeColor);
+        grad.addColorStop(0.62, currentTheme.pipeHighlight);
+        grad.addColorStop(1, currentTheme.pipeColor);
+      }
       ctx.fillStyle = grad;
       pathRoundRect(sx, sy, w, sh, r);
       ctx.fill();
@@ -811,7 +845,7 @@ window.addEventListener('DOMContentLoaded', () => {
       // faceted diagonal shimmer stripes for a crystal look
       ctx.save();
       ctx.clip();
-      ctx.globalAlpha = 0.18;
+      ctx.globalAlpha = pipe.golden ? 0.32 : 0.18;
       ctx.fillStyle = "#ffffff";
       const stripeGap = 22 * SCALE;
       for (let sX = -sh; sX < w + sh; sX += stripeGap) {
@@ -835,13 +869,13 @@ window.addEventListener('DOMContentLoaded', () => {
     // Gem caps facing the gap, with a soft glow, instead of a flat lip
     const drawCap = (capY) => {
       ctx.save();
-      ctx.shadowColor = currentTheme.pipeCap;
-      ctx.shadowBlur = 10 * SCALE;
-      ctx.fillStyle = currentTheme.pipeAccent;
+      ctx.shadowColor = pipe.golden ? "#fde047" : currentTheme.pipeCap;
+      ctx.shadowBlur = (pipe.golden ? 16 : 10) * SCALE;
+      ctx.fillStyle = pipe.golden ? "#b45309" : currentTheme.pipeAccent;
       pathRoundRect(pipe.x - 5 * SCALE, capY, w + 10 * SCALE, capH, capH / 2);
       ctx.fill();
       ctx.shadowBlur = 0;
-      ctx.fillStyle = currentTheme.pipeCap;
+      ctx.fillStyle = pipe.golden ? "#fde047" : currentTheme.pipeCap;
       ctx.beginPath();
       ctx.arc(pipe.x + w / 2, capY + capH / 2, 6 * SCALE, 0, Math.PI * 2);
       ctx.fill();
@@ -868,6 +902,16 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.shadowBlur = 8 * SCALE;
       ctx.fillText("⚔️", 0, 0);
       ctx.restore();
+
+      // Trailing spark behind the blade to sell the spinning motion
+      if (frameCount % 3 === 0) {
+        particles.push({
+          x: sx, y: sy, vx: 0, vy: 0,
+          size: (Math.random() * 3 + 2) * SCALE, color: "#facc15",
+          alpha: 0.8, gravity: 0,
+          rotation: 0, vRot: 0
+        });
+      }
     }
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
@@ -985,6 +1029,12 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.font = `600 ${14 * SCALE}px 'Nunito', -apple-system, sans-serif`;
       ctx.fillText(`Knight Shield Hits Left: ${giantShield.pipesRemaining}`, pad, hudY);
     }
+    if (swordStreak > 0) {
+      hudY += 20 * SCALE;
+      ctx.font = `${swordStreakFlashTimer > 0 ? 700 : 600} ${(swordStreakFlashTimer > 0 ? 16 : 14) * SCALE}px 'Nunito', -apple-system, sans-serif`;
+      ctx.fillStyle = swordStreakFlashTimer > 0 ? "#f97316" : "#facc15";
+      ctx.fillText(`🔥 Sword Streak: ${swordStreak}`, pad, hudY);
+    }
   }
 
   // ===========================================================================
@@ -1013,6 +1063,8 @@ window.addEventListener('DOMContentLoaded', () => {
     giantShield.pipesRemaining = 0;
     slowMoTimer = 0;
     scoreMultiplierTimer = 0;
+    swordStreak = 0;
+    swordStreakFlashTimer = 0;
     score = 0;
     pipes = [];
     items = [];
