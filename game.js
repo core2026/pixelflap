@@ -1,7 +1,18 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.2.00
+ * Version: v2.3.00
+ *
+ * WHAT CHANGED IN v2.3.00
+ * - Pipe gaps no longer swing straight from floor to ceiling back-to-back;
+ *   each new gap is clamped near the previous one's height.
+ * - Reworked pipe art: rounded gradient "crystal pillar" pipes with glowing
+ *   gem caps and shimmer facets, replacing the flat green Flappy-Bird-style
+ *   pipes. Each theme now has its own pipe palette (no more plain green).
+ * - Sword pickup now grants a real spinning sword: orbiting blades shatter
+ *   any pipe the player touches (consuming a charge) instead of ending the
+ *   run. Picking up a Shield while carrying a sword (or vice versa) still
+ *   triggers the Knight's Aegis giant-shield combo as before.
  *
  * WHAT CHANGED IN v2.2.00
  * - Added pure JS 8-bit retro background music synth loop using Web Audio API.
@@ -10,7 +21,7 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.2.00";
+  const GAME_VERSION = "v2.3.00";
 
   // ===========================================================================
   // 0. CONFIG
@@ -78,10 +89,10 @@ window.addEventListener('DOMContentLoaded', () => {
   let SCALE = 1;
 
   const THEMES = {
-    day: { name: 'Day', background: "#38bdf8", pipeColor: "#059669", pipeAccent: "#047857", cloudColor: "rgba(255, 255, 255, 0.75)" },
-    sunset: { name: 'Sunset', background: "#f97316", pipeColor: "#c2410c", pipeAccent: "#9a3412", cloudColor: "rgba(254, 215, 170, 0.65)" },
-    night: { name: 'Night', background: "#1e1b4b", pipeColor: "#6d28d9", pipeAccent: "#5b21b6", cloudColor: "rgba(199, 210, 254, 0.45)" },
-    retro: { name: 'Cyberpunk', background: "#0f172a", pipeColor: "#06b6d4", pipeAccent: "#0e7490", cloudColor: "rgba(244, 114, 182, 0.35)" }
+    day: { name: 'Day', background: "#38bdf8", pipeColor: "#8b5cf6", pipeAccent: "#6d28d9", pipeHighlight: "#ddd6fe", pipeCap: "#fbbf24", cloudColor: "rgba(255, 255, 255, 0.75)" },
+    sunset: { name: 'Sunset', background: "#f97316", pipeColor: "#f43f5e", pipeAccent: "#be123c", pipeHighlight: "#fecdd3", pipeCap: "#fde047", cloudColor: "rgba(254, 215, 170, 0.65)" },
+    night: { name: 'Night', background: "#1e1b4b", pipeColor: "#4338ca", pipeAccent: "#312e81", pipeHighlight: "#a5b4fc", pipeCap: "#38bdf8", cloudColor: "rgba(199, 210, 254, 0.45)" },
+    retro: { name: 'Cyberpunk', background: "#0f172a", pipeColor: "#06b6d4", pipeAccent: "#0e7490", pipeHighlight: "#a5f3fc", pipeCap: "#f472b6", cloudColor: "rgba(244, 114, 182, 0.35)" }
   };
   let currentTheme = THEMES.day;
 
@@ -219,7 +230,7 @@ window.addEventListener('DOMContentLoaded', () => {
     x: 90, y: 300, width: 38, height: 38, vy: 0,
     gravity: 0.36, jumpStrength: -7.2,
     shieldCount: 1,
-    inventory: { sword: false }
+    inventory: { sword: false, swordCharges: 0 }
   };
 
   const giantShield = { active: false, pipesRemaining: 0 };
@@ -228,6 +239,7 @@ window.addEventListener('DOMContentLoaded', () => {
   let items = [];
   let particles = [];
   let floatingTexts = [];
+  let lastPipeCenterY = null; // tracks previous gap center so pipes don't swing floor-to-ceiling back to back
 
   // ===========================================================================
   // 5. RESPONSIVE CANVAS SIZING
@@ -418,7 +430,7 @@ window.addEventListener('DOMContentLoaded', () => {
     { icon: '🛡️', title: 'Aura Shield', body: 'Blocks 1 hit. Grab a 2nd to stack a double barrier!' },
     { icon: '🐢', title: 'Turtle Time', body: 'Everything slows way down for 8 seconds!' },
     { icon: '💎', title: 'Gem Multiplier', body: 'Doubles your points for a while!' },
-    { icon: '⚔️', title: 'Sword Pickup', body: 'Combine with an active Shield for a surprise!' },
+    { icon: '⚔️', title: 'Spinning Sword', body: 'Orbiting blades slice any pipe you touch! Combine with a Shield for a surprise!' },
     { icon: '🛡️+⚔️', title: "Knight's Rampage", body: 'Smashes 6 pipes in a row for +50 points!' },
   ];
 
@@ -558,7 +570,8 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     } else if (type === 'sword') {
       player.inventory.sword = true;
-      spawnFloatingText("GOT SWORD!", player.x, player.y - 15, "#facc15");
+      player.inventory.swordCharges = Math.min(5, player.inventory.swordCharges + 3);
+      spawnFloatingText("⚔️ SPINNING SWORD!", player.x, player.y - 15, "#facc15");
     } else if (type === 'slow') {
       slowMoTimer = 480;
       spawnFloatingText("🐢 TURTLE TIME!", player.x, player.y - 15, "#22c55e");
@@ -572,6 +585,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function triggerGiantShieldCombo() {
     player.shieldCount = 0;
     player.inventory.sword = false;
+    player.inventory.swordCharges = 0;
     giantShield.active = true;
     giantShield.pipesRemaining = 6;
     score += 50;
@@ -597,9 +611,23 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function spawnPipe() {
     const gap = Math.max(130 * SCALE, VH * 0.22);
-    const minHeight = 60 * SCALE;
-    const maxHeight = VH - gap - minHeight;
-    const topHeight = Math.floor(Math.random() * Math.max(1, maxHeight - minHeight)) + minHeight;
+    const minCenter = gap / 2 + 60 * SCALE;
+    const maxCenter = VH - gap / 2 - 60 * SCALE;
+
+    let center;
+    if (lastPipeCenterY === null) {
+      center = minCenter + Math.random() * Math.max(1, maxCenter - minCenter);
+    } else {
+      // Limit how far the gap can move vertically from the previous pipe so
+      // it never leaps straight from the floor to the ceiling (or back).
+      const maxShift = VH * 0.32;
+      const lo = Math.max(minCenter, lastPipeCenterY - maxShift);
+      const hi = Math.min(maxCenter, lastPipeCenterY + maxShift);
+      center = lo + Math.random() * Math.max(1, hi - lo);
+    }
+    lastPipeCenterY = center;
+
+    const topHeight = Math.round(center - gap / 2);
     const pipeX = VW;
     pipes.push({ x: pipeX, width: 60 * SCALE, topHeight, bottomY: topHeight + gap, passed: false, shattered: false });
     spawnItem(pipeX, topHeight, gap);
@@ -684,7 +712,20 @@ window.addEventListener('DOMContentLoaded', () => {
       } else {
         const hitBox = (player.x + player.width > pipe.x && player.x < pipe.x + pipe.width &&
           (player.y < pipe.topHeight || player.y + player.height > pipe.bottomY));
-        if (hitBox) handlePlayerHit(pipe);
+        if (hitBox) {
+          if (player.inventory.sword && player.inventory.swordCharges > 0) {
+            pipe.shattered = true;
+            player.inventory.swordCharges--;
+            if (player.inventory.swordCharges <= 0) player.inventory.sword = false;
+            score += 3;
+            playSound('shatter');
+            createPipeShatterParticles(pipe.x, 0, pipe.width, pipe.topHeight);
+            createPipeShatterParticles(pipe.x, pipe.bottomY, pipe.width, VH - pipe.bottomY);
+            spawnFloatingText("⚔️ SLICED! +3", pipe.x, player.y - 20, "#facc15");
+          } else {
+            handlePlayerHit(pipe);
+          }
+        }
       }
 
       if (pipe.x + pipe.width < 0) pipes.splice(i, 1);
@@ -736,6 +777,102 @@ window.addEventListener('DOMContentLoaded', () => {
     ctx.restore();
   }
 
+  // Rounded-rect helper (some older WebViews lack native ctx.roundRect)
+  function pathRoundRect(x, y, w, h, r) {
+    const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+  }
+
+  // Crystal-pillar pipe design: rounded gradient shafts with a glowing gem
+  // cap, replacing the flat green rectangular Flappy-Bird-style pipes.
+  function drawPipe(pipe) {
+    if (pipe.shattered) return;
+    const w = pipe.width;
+    const capH = 20 * SCALE;
+    const r = 10 * SCALE;
+
+    const drawShaft = (sx, sy, sh) => {
+      if (sh <= 0) return;
+      const grad = ctx.createLinearGradient(sx, 0, sx + w, 0);
+      grad.addColorStop(0, currentTheme.pipeAccent);
+      grad.addColorStop(0.45, currentTheme.pipeColor);
+      grad.addColorStop(0.62, currentTheme.pipeHighlight);
+      grad.addColorStop(1, currentTheme.pipeColor);
+      ctx.fillStyle = grad;
+      pathRoundRect(sx, sy, w, sh, r);
+      ctx.fill();
+
+      // faceted diagonal shimmer stripes for a crystal look
+      ctx.save();
+      ctx.clip();
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = "#ffffff";
+      const stripeGap = 22 * SCALE;
+      for (let sX = -sh; sX < w + sh; sX += stripeGap) {
+        ctx.beginPath();
+        ctx.moveTo(sx + sX, sy);
+        ctx.lineTo(sx + sX + 8 * SCALE, sy);
+        ctx.lineTo(sx + sX + 8 * SCALE - sh, sy + sh);
+        ctx.lineTo(sx + sX - sh, sy + sh);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    };
+
+    // top shaft (hangs from y=0 down to topHeight)
+    drawShaft(pipe.x, 0, pipe.topHeight);
+    // bottom shaft (from bottomY to floor)
+    drawShaft(pipe.x, pipe.bottomY, VH - pipe.bottomY);
+
+    // Gem caps facing the gap, with a soft glow, instead of a flat lip
+    const drawCap = (capY) => {
+      ctx.save();
+      ctx.shadowColor = currentTheme.pipeCap;
+      ctx.shadowBlur = 10 * SCALE;
+      ctx.fillStyle = currentTheme.pipeAccent;
+      pathRoundRect(pipe.x - 5 * SCALE, capY, w + 10 * SCALE, capH, capH / 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = currentTheme.pipeCap;
+      ctx.beginPath();
+      ctx.arc(pipe.x + w / 2, capY + capH / 2, 6 * SCALE, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+    if (pipe.topHeight > 0) drawCap(pipe.topHeight - capH * 0.6);
+    if (VH - pipe.bottomY > 0) drawCap(pipe.bottomY - capH * 0.4);
+  }
+
+  function drawSpinningSword(cx, cy) {
+    const orbitR = (player.width / 2 + 20) * SCALE;
+    const angle = frameCount * 0.14;
+    for (let i = 0; i < player.inventory.swordCharges; i++) {
+      const a = angle + (i * (Math.PI * 2 / Math.max(1, player.inventory.swordCharges)));
+      const sx = cx + Math.cos(a) * orbitR;
+      const sy = cy + Math.sin(a) * orbitR;
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.rotate(a + Math.PI / 2 + frameCount * 0.25);
+      ctx.font = `${20 * SCALE}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "#facc15";
+      ctx.shadowBlur = 8 * SCALE;
+      ctx.fillText("⚔️", 0, 0);
+      ctx.restore();
+    }
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+  }
+
   function draw() {
     ctx.fillStyle = currentTheme.background;
     ctx.fillRect(0, 0, VW, VH);
@@ -749,15 +886,7 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.fill();
     });
 
-    pipes.forEach(pipe => {
-      if (pipe.shattered) return;
-      ctx.fillStyle = currentTheme.pipeColor;
-      ctx.fillRect(pipe.x, 0, pipe.width, pipe.topHeight);
-      ctx.fillRect(pipe.x, pipe.bottomY, pipe.width, VH - pipe.bottomY);
-      ctx.fillStyle = currentTheme.pipeAccent;
-      ctx.fillRect(pipe.x - 4 * SCALE, pipe.topHeight - 18 * SCALE, pipe.width + 8 * SCALE, 18 * SCALE);
-      ctx.fillRect(pipe.x - 4 * SCALE, pipe.bottomY, pipe.width + 8 * SCALE, 18 * SCALE);
-    });
+    pipes.forEach(pipe => drawPipe(pipe));
 
     items.forEach(item => {
       ctx.font = `${24 * SCALE}px sans-serif`;
@@ -805,6 +934,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
     if (giantShield.active) drawKnightKiteShield(player.x + player.width + 24 * SCALE, player.y + player.height / 2);
 
+    if (player.inventory.sword && player.inventory.swordCharges > 0 && !giantShield.active) {
+      drawSpinningSword(player.x + player.width / 2, player.y + player.height / 2);
+    }
+
     floatingTexts.forEach(ft => {
       ctx.save();
       ctx.globalAlpha = Math.max(0, ft.alpha);
@@ -832,7 +965,7 @@ window.addEventListener('DOMContentLoaded', () => {
     let hudY = 78 * SCALE;
     let invStatus = "Shields: ";
     if (player.shieldCount > 0) invStatus += `🛡️ x${player.shieldCount} `;
-    if (player.inventory.sword) invStatus += "⚔️ ";
+    if (player.inventory.sword) invStatus += `⚔️ x${player.inventory.swordCharges} `;
     ctx.font = `${14 * SCALE}px 'Nunito', -apple-system, sans-serif`;
     ctx.fillText(invStatus, pad, hudY);
 
@@ -875,6 +1008,7 @@ window.addEventListener('DOMContentLoaded', () => {
     player.vy = 0;
     player.shieldCount = 1;
     player.inventory.sword = false;
+    player.inventory.swordCharges = 0;
     giantShield.active = false;
     giantShield.pipesRemaining = 0;
     slowMoTimer = 0;
@@ -886,6 +1020,7 @@ window.addEventListener('DOMContentLoaded', () => {
     floatingTexts = [];
     frameCount = 0;
     gameOver = false;
+    lastPipeCenterY = null;
   }
 
   function gameLoop() {
