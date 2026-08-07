@@ -14,7 +14,7 @@
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#3fc7ff">
   <meta name="description" content="PixelJump - a bright, bouncy flap-and-dodge adventure for kids!">
-  <title>PixelJump - v2.7.00</title>
+  <title>PixelJump - v2.8.00</title>
 
   <!--
     =====================================================================
@@ -46,7 +46,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css?v=2.3.0">
+  <link rel="stylesheet" href="style.css?v=2.4.0">
 </head>
 <body>
 
@@ -101,8 +101,17 @@
           <p class="avatar-hint">👉 Or tap the camera 📷 to play as YOU!</p>
         </div>
 
+        <div class="input-group">
+          <label id="difficultyLabel">Choose Difficulty</label>
+          <div class="difficulty-selector" id="difficultySelector" role="radiogroup" aria-labelledby="difficultyLabel">
+            <button type="button" class="diff-btn" data-difficulty="easy">😌 Easy</button>
+            <button type="button" class="diff-btn" data-difficulty="normal">⚖️ Normal</button>
+            <button type="button" class="diff-btn" data-difficulty="hard">🔥 Hard</button>
+          </div>
+        </div>
+
         <div class="leaderboard-box" id="splashLeaderboardBox">
-          <h3>🏆 Top 15 Hall of Fame 🏆</h3>
+          <h3>🏆 Top 15 — <span id="splashLeaderboardDiff">Normal</span> 🏆</h3>
           <p class="leaderboard-status" id="splashLeaderboardStatus">Loading scores…</p>
           <ul class="leaderboard-list" id="splashLeaderboardList"></ul>
         </div>
@@ -156,7 +165,7 @@
         </div>
 
         <div class="leaderboard-box" id="gameOverLeaderboardBox">
-          <h3>🏅 Top 15 Leaderboard 🏅</h3>
+          <h3>🏅 Top 15 — <span id="gameOverLeaderboardDiff">Normal</span> 🏅</h3>
           <p class="leaderboard-status" id="gameOverLeaderboardStatus">Loading scores…</p>
           <ul class="leaderboard-list" id="gameOverLeaderboardList"></ul>
         </div>
@@ -191,5 +200,5 @@
   <!-- Hidden native file input used for uploading a custom avatar photo -->
   <input type="file" id="avatarUpload" accept="image/*" aria-hidden="true">
 
-<script src="game.js?v=2.7.00"></script></body>
+<script src="game.js?v=2.8.00"></script></body>
 </html>

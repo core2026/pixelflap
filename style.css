@@ -1,6 +1,6 @@
 /* =========================================================================
    PixelJump Stylesheet
-   Version: v2.3.0
+   Version: v2.4.0
 
    AI / DEVELOPER EDITING REQUIREMENT:
    Any assistant or developer who edits this file MUST bump the version
@@ -319,6 +319,42 @@ input[type="text"].invalid {
   text-shadow: 0 1px 3px rgba(0,0,0,0.25);
   margin-top: -4px;
 }
+
+/* -------------------------------------------------------------------------
+   Difficulty selector (Easy / Normal / Hard) — same sizing rhythm as
+   avatar-btn, but a horizontal pill row instead of round icons.
+------------------------------------------------------------------------- */
+.difficulty-selector {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.diff-btn {
+  flex: 1;
+  padding: 10px 6px;
+  border-radius: 14px;
+  border: 3px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.diff-btn:hover { transform: scale(1.05); }
+
+.diff-btn.active {
+  border-color: var(--candy-pink);
+  transform: scale(1.06);
+  box-shadow: 0 0 0 4px rgba(255, 111, 165, 0.35), var(--shadow-soft);
+}
+
+.diff-btn[data-difficulty="easy"].active { border-color: var(--grass-green); box-shadow: 0 0 0 4px rgba(82, 209, 124, 0.35), var(--shadow-soft); }
+.diff-btn[data-difficulty="hard"].active { border-color: #ef4444; box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.35), var(--shadow-soft); }
 
 /* -------------------------------------------------------------------------
    Leaderboard card

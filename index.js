@@ -1,6 +1,22 @@
 /**
  * Cloudflare Worker API for PixelJump / PixelFlap Leaderboard
  * Interacts with Cloudflare D1 Database (env.DB)
+ *
+ * =============================================================================
+ * ONE-TIME MIGRATION REQUIRED before deploying this version
+ * =============================================================================
+ * This version adds per-difficulty leaderboards. Existing "leaderboard"
+ * tables need a new "difficulty" column (existing rows are treated as
+ * "normal" difficulty). Run this once against your D1 database, e.g. via
+ * wrangler:
+ *
+ *   wrangler d1 execute <YOUR_DB_NAME> --remote --command \
+ *     "ALTER TABLE leaderboard ADD COLUMN difficulty TEXT NOT NULL DEFAULT 'normal';"
+ *
+ * (or run the same ALTER TABLE statement from the D1 tab in the Cloudflare
+ * dashboard's Query Console). Deploying this Worker before running that
+ * migration will cause every request to fail with a "no such column" error.
+ * =============================================================================
  */
 
 const corsHeaders = {
@@ -8,6 +24,13 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
+
+const VALID_DIFFICULTIES = new Set(["easy", "normal", "hard"]);
+
+function cleanDifficulty(raw) {
+  const d = String(raw || "normal").toLowerCase();
+  return VALID_DIFFICULTIES.has(d) ? d : "normal";
+}
 
 export default {
   async fetch(request, env, ctx) {
@@ -22,17 +45,21 @@ export default {
     }
 
     try {
-      // 2. GET /api/leaderboard - Fetch Top 15 Scores with ISO Timestamps
+      // 2. GET /api/leaderboard?difficulty=easy|normal|hard - Fetch Top 15
       if (request.method === "GET" && url.pathname === "/api/leaderboard") {
+        const difficulty = cleanDifficulty(url.searchParams.get("difficulty"));
+
         const { results } = await env.DB.prepare(
           `SELECT 
             player_name, 
             score, 
+            difficulty,
             strftime('%Y-%m-%dT%H:%M:%SZ', COALESCE(created_at, CURRENT_TIMESTAMP)) AS created_at 
            FROM leaderboard 
+           WHERE difficulty = ?
            ORDER BY score DESC 
            LIMIT 15`
-        ).all();
+        ).bind(difficulty).all();
 
         return new Response(JSON.stringify(results || []), {
           status: 200,
@@ -46,11 +73,12 @@ export default {
       // 3. POST /api/leaderboard - Submit a New Score
       if (request.method === "POST" && url.pathname === "/api/leaderboard") {
         const body = await request.json().catch(() => ({}));
-        
+
         // Clean & validate input
         const rawName = body.name || body.player_name || "AAA";
         const cleanName = String(rawName).trim().toUpperCase().replace(/[^A-Z]/g, "").substring(0, 3) || "AAA";
         const score = parseInt(body.score, 10);
+        const difficulty = cleanDifficulty(body.difficulty);
 
         if (isNaN(score)) {
           return new Response(JSON.stringify({ error: "Invalid score" }), {
@@ -61,11 +89,11 @@ export default {
 
         // Insert new score with automatic server timestamp
         await env.DB.prepare(
-          `INSERT INTO leaderboard (player_name, score, created_at) 
-           VALUES (?, ?, CURRENT_TIMESTAMP)`
-        ).bind(cleanName, score).run();
+          `INSERT INTO leaderboard (player_name, score, difficulty, created_at) 
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP)`
+        ).bind(cleanName, score, difficulty).run();
 
-        return new Response(JSON.stringify({ success: true, name: cleanName, score }), {
+        return new Response(JSON.stringify({ success: true, name: cleanName, score, difficulty }), {
           status: 201,
           headers: {
             ...corsHeaders,

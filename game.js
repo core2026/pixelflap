@@ -1,7 +1,15 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.7.00
+ * Version: v2.8.00
+ *
+ * WHAT CHANGED IN v2.8.00
+ * - Difficulty presets: Easy / Normal / Hard, selectable on the splash
+ *   screen. Each tunes base pipe speed, gap size, and how fast the ramp
+ *   tightens up. Choice is remembered between visits.
+ * - High scores, personal bests, and the leaderboard are now tracked
+ *   separately per difficulty (both locally and via the backend — see
+ *   index.js for the required one-time database migration).
  *
  * WHAT CHANGED IN v2.7.00
  * - Visual difficulty cues: a subtle screen darkening plus faint motion-line
@@ -71,7 +79,7 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.7.00";
+  const GAME_VERSION = "v2.8.00";
 
   // ===========================================================================
   // 0. CONFIG
@@ -81,6 +89,16 @@ window.addEventListener('DOMContentLoaded', () => {
     BASE_W: 450,
     BASE_H: 750,
   };
+
+  // Difficulty presets: each tunes base pipe speed, gap size, and how fast
+  // the ramp (see difficultyLevel()) tightens things up. High scores are
+  // tracked separately per difficulty (see leaderboard section).
+  const DIFFICULTY_PRESETS = {
+    easy:   { label: 'Easy',   speedMult: 0.82, gapBonus: 26,  rampRate: 0.012, gapRampRate: 0.50, intervalRampRate: 0.40, intervalFloor: 92, gapFloor: 112 },
+    normal: { label: 'Normal', speedMult: 1.00, gapBonus: 0,   rampRate: 0.020, gapRampRate: 0.85, intervalRampRate: 0.70, intervalFloor: 78, gapFloor: 100 },
+    hard:   { label: 'Hard',   speedMult: 1.18, gapBonus: -18, rampRate: 0.030, gapRampRate: 1.15, intervalRampRate: 0.95, intervalFloor: 62, gapFloor: 86 },
+  };
+  const VALID_DIFFICULTIES = ['easy', 'normal', 'hard'];
 
   // ===========================================================================
   // 1. DOM REFERENCES
@@ -108,6 +126,10 @@ window.addEventListener('DOMContentLoaded', () => {
   const statRampFillEl = document.getElementById('statRampFill');
   const statRampLabelEl = document.getElementById('statRampLabel');
 
+  const difficultySelector = document.getElementById('difficultySelector');
+  const splashLeaderboardDiff = document.getElementById('splashLeaderboardDiff');
+  const gameOverLeaderboardDiff = document.getElementById('gameOverLeaderboardDiff');
+
   const splashLeaderboardList = document.getElementById('splashLeaderboardList');
   const splashLeaderboardStatus = document.getElementById('splashLeaderboardStatus');
   const gameOverLeaderboardList = document.getElementById('gameOverLeaderboardList');
@@ -128,7 +150,15 @@ window.addEventListener('DOMContentLoaded', () => {
   let score = 0;
   let playerInitials = (localStorage.getItem('pixeljump_initials') || "").toUpperCase();
 
-  let highScores = JSON.parse(localStorage.getItem('pixeljump_top15_cache')) || [
+  let selectedDifficulty = VALID_DIFFICULTIES.includes(localStorage.getItem('pixeljump_difficulty'))
+    ? localStorage.getItem('pixeljump_difficulty') : 'normal';
+
+  function getDifficultyPreset() { return DIFFICULTY_PRESETS[selectedDifficulty] || DIFFICULTY_PRESETS.normal; }
+  function difficultyLabel(d) { return DIFFICULTY_PRESETS[d] ? DIFFICULTY_PRESETS[d].label : 'Normal'; }
+  function scoreCacheKey(d) { return `pixeljump_top15_cache_${d}`; }
+  function personalBestKey(d) { return `pixeljump_personal_best_${d}`; }
+
+  let highScores = JSON.parse(localStorage.getItem(scoreCacheKey(selectedDifficulty))) || [
     { name: "ACE", score: 50, date: "Aug 02, 14:20" },
     { name: "JMP", score: 35, date: "Aug 03, 09:15" },
     { name: "CAT", score: 20, date: "Aug 04, 18:45" },
@@ -174,7 +204,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // this not syncing across devices without a real account system).
   let totalCoins = parseInt(localStorage.getItem('pixeljump_total_coins'), 10) || 0;
   let coinsThisRun = 0;
-  let personalBest = parseInt(localStorage.getItem('pixeljump_personal_best'), 10) || 0;
+  let personalBest = parseInt(localStorage.getItem(personalBestKey(selectedDifficulty)), 10) || 0;
 
   let VW = CONFIG.BASE_W;
   let VH = CONFIG.BASE_H;
@@ -423,10 +453,17 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function updateLeaderboardDiffLabels() {
+    const label = difficultyLabel(selectedDifficulty);
+    if (splashLeaderboardDiff) splashLeaderboardDiff.textContent = label;
+    if (gameOverLeaderboardDiff) gameOverLeaderboardDiff.textContent = label;
+  }
+
   async function fetchLeaderboard() {
     setLeaderboardStatus('Loading scores…');
+    updateLeaderboardDiffLabels();
     try {
-      const res = await fetch(`${CONFIG.API_BASE_URL}/api/leaderboard`);
+      const res = await fetch(`${CONFIG.API_BASE_URL}/api/leaderboard?difficulty=${selectedDifficulty}`);
       if (!res.ok) throw new Error('Bad response');
       const data = await res.json();
 
@@ -439,7 +476,7 @@ window.addEventListener('DOMContentLoaded', () => {
         };
       });
 
-      localStorage.setItem('pixeljump_top15_cache', JSON.stringify(highScores));
+      localStorage.setItem(scoreCacheKey(selectedDifficulty), JSON.stringify(highScores));
       leaderboardOnline = true;
       setLeaderboardStatus('🌐 Live global scores');
     } catch (err) {
@@ -455,15 +492,47 @@ window.addEventListener('DOMContentLoaded', () => {
       await fetch(`${CONFIG.API_BASE_URL}/api/leaderboard`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: validName, score: newScore })
+        body: JSON.stringify({ name: validName, score: newScore, difficulty: selectedDifficulty })
       });
     } catch (err) {
       highScores.push({ name: validName, score: newScore, date: '--' });
       highScores.sort((a, b) => b.score - a.score);
       highScores = highScores.slice(0, 15);
-      localStorage.setItem('pixeljump_top15_cache', JSON.stringify(highScores));
+      localStorage.setItem(scoreCacheKey(selectedDifficulty), JSON.stringify(highScores));
     }
     await fetchLeaderboard();
+  }
+
+  // ===========================================================================
+  // 6b. DIFFICULTY SELECTOR
+  // ===========================================================================
+  function applyDifficultyUI() {
+    if (!difficultySelector) return;
+    difficultySelector.querySelectorAll('.diff-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.difficulty === selectedDifficulty);
+    });
+  }
+
+  function selectDifficulty(diff) {
+    if (!VALID_DIFFICULTIES.includes(diff) || diff === selectedDifficulty) {
+      if (diff === selectedDifficulty) applyDifficultyUI();
+      return;
+    }
+    selectedDifficulty = diff;
+    localStorage.setItem('pixeljump_difficulty', selectedDifficulty);
+    personalBest = parseInt(localStorage.getItem(personalBestKey(selectedDifficulty)), 10) || 0;
+    highScores = JSON.parse(localStorage.getItem(scoreCacheKey(selectedDifficulty))) || [];
+    applyDifficultyUI();
+    renderLeaderboardLists();
+    fetchLeaderboard();
+  }
+
+  function initDifficultySelector() {
+    if (!difficultySelector) return;
+    applyDifficultyUI();
+    difficultySelector.querySelectorAll('.diff-btn').forEach(btn => {
+      btn.addEventListener('click', () => selectDifficulty(btn.dataset.difficulty));
+    });
   }
 
   // ===========================================================================
@@ -765,9 +834,10 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function spawnPipe() {
+    const preset = getDifficultyPreset();
     const d = difficultyLevel();
-    const baseGap = Math.max(130 * SCALE, VH * 0.22);
-    const gap = Math.max(100 * SCALE, baseGap - d * 0.85 * SCALE);
+    const baseGap = Math.max(130 * SCALE, VH * 0.22) + preset.gapBonus * SCALE;
+    const gap = Math.max(preset.gapFloor * SCALE, baseGap - d * preset.gapRampRate * SCALE);
     const minCenter = gap / 2 + 60 * SCALE;
     const maxCenter = VH - gap / 2 - 60 * SCALE;
 
@@ -801,8 +871,9 @@ window.addEventListener('DOMContentLoaded', () => {
     if (magnetTimer > 0) magnetTimer--;
     if (shrinkTimer > 0) shrinkTimer--;
 
-    const speedRamp = 1 + difficultyLevel() * 0.02; // gradually up to +80% at the cap
-    const currentSpeed = (slowMoTimer > 0 ? 1.1 : 2.2 * speedRamp) * SCALE;
+    const preset = getDifficultyPreset();
+    const speedRamp = 1 + difficultyLevel() * preset.rampRate;
+    const currentSpeed = (slowMoTimer > 0 ? 1.1 : 2.2 * preset.speedMult * speedRamp) * SCALE;
 
     if (score >= 30) currentTheme = THEMES.retro;
     else if (score >= 20) currentTheme = THEMES.night;
@@ -846,7 +917,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (player.y + player.height >= VH || player.y <= 0) handlePlayerHit();
 
     const baseInterval = (slowMoTimer > 0) ? 220 : 110;
-    const pipeSpawnInterval = Math.max(78, Math.round(baseInterval - difficultyLevel() * 0.7));
+    const pipeSpawnInterval = Math.max(preset.intervalFloor, Math.round(baseInterval - difficultyLevel() * preset.intervalRampRate));
     if (frameCount % pipeSpawnInterval === 0) spawnPipe();
 
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
@@ -1408,11 +1479,11 @@ window.addEventListener('DOMContentLoaded', () => {
       let isNewBest = false;
       if (score > personalBest) {
         personalBest = score;
-        localStorage.setItem('pixeljump_personal_best', String(personalBest));
+        localStorage.setItem(personalBestKey(selectedDifficulty), String(personalBest));
         isNewBest = true;
       }
 
-      finalScoreEl.textContent = `Score (${playerInitials || "---"}): ${score} pts`;
+      finalScoreEl.textContent = `Score (${playerInitials || "---"}): ${score} pts — ${difficultyLabel(selectedDifficulty)}`;
       renderStatsPanel(isNewBest);
       showScreen('gameover');
       gameContainer.classList.add('shake');
@@ -1489,6 +1560,7 @@ window.addEventListener('DOMContentLoaded', () => {
   buildAvatarSelector();
   buildInfoGrid();
   updateCoinBadge();
+  initDifficultySelector();
   fetchLeaderboard();
   gameLoop();
 });
