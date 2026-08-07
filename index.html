@@ -14,7 +14,7 @@
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#3fc7ff">
   <meta name="description" content="PixelJump - a bright, bouncy flap-and-dodge adventure for kids!">
-  <title>PixelJump - v2.6.00</title>
+  <title>PixelJump - v2.7.00</title>
 
   <!--
     =====================================================================
@@ -46,7 +46,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css?v=2.2.0">
+  <link rel="stylesheet" href="style.css?v=2.3.0">
 </head>
 <body>
 
@@ -140,9 +140,18 @@
             <span class="stat-label">😅 Best Close-Call Streak</span>
             <span class="stat-value" id="statGrazeStreak">0</span>
           </div>
+          <div class="stat-item">
+            <span class="stat-label">🎯 Best Perfect Streak</span>
+            <span class="stat-value" id="statPerfectStreak">0</span>
+          </div>
           <div class="stat-item stat-wide">
             <span class="stat-label">🪙 Coins Earned</span>
             <span class="stat-value" id="statCoins">+0 (Total: 0)</span>
+          </div>
+          <div class="stat-item stat-wide">
+            <span class="stat-label">📈 Speed Reached</span>
+            <div class="ramp-bar-track"><div class="ramp-bar-fill" id="statRampFill"></div></div>
+            <span class="stat-value" id="statRampLabel">0/40</span>
           </div>
         </div>
 
@@ -182,5 +191,5 @@
   <!-- Hidden native file input used for uploading a custom avatar photo -->
   <input type="file" id="avatarUpload" accept="image/*" aria-hidden="true">
 
-<script src="game.js?v=2.6.00"></script></body>
+<script src="game.js?v=2.7.00"></script></body>
 </html>

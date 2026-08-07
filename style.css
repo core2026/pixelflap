@@ -1,6 +1,6 @@
 /* =========================================================================
    PixelJump Stylesheet
-   Version: v2.2.0
+   Version: v2.3.0
 
    AI / DEVELOPER EDITING REQUIREMENT:
    Any assistant or developer who edits this file MUST bump the version
@@ -532,6 +532,24 @@ input[type="text"].invalid {
   font-weight: 700;
   color: var(--grape-purple);
   text-align: center;
+}
+
+.ramp-bar-track {
+  width: 100%;
+  height: 10px;
+  background: #f1f1f6;
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 4px 0 2px;
+  border: 1px solid rgba(43, 35, 80, 0.1);
+}
+
+.ramp-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #38bdf8, #f97316);
+  border-radius: 999px;
+  transition: width 0.5s ease;
 }
 
 .shake { animation: shakeAnim 0.3s ease-in-out; }

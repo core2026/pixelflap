@@ -1,7 +1,20 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.6.00
+ * Version: v2.7.00
+ *
+ * WHAT CHANGED IN v2.7.00
+ * - Visual difficulty cues: a subtle screen darkening plus faint motion-line
+ *   particles kick in as the speed ramp progresses, so it *feels* faster,
+ *   not just runs faster.
+ * - Perfect Run streak: a skill-only bonus for clearing pipes in a row
+ *   without collecting ANY item (+8 every 8 in a row). Breaks the moment
+ *   you grab a pickup or take a hit.
+ * - Rubber-band mercy: three early deaths (under 5 pipes) in a row eases
+ *   the difficulty ramp back for the next attempt, with a small friendly
+ *   callout. Resets the moment a run clears 5+ pipes. Session-only.
+ * - Game-over stats panel now shows Best Perfect Streak and a "Speed
+ *   Reached" progress bar showing how far into the 40-pipe ramp you got.
  *
  * WHAT CHANGED IN v2.6.00
  * - Coins now render as a hand-drawn spinning gold coin (gradient body,
@@ -58,7 +71,7 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.6.00";
+  const GAME_VERSION = "v2.7.00";
 
   // ===========================================================================
   // 0. CONFIG
@@ -91,6 +104,9 @@ window.addEventListener('DOMContentLoaded', () => {
   const statSwordStreakEl = document.getElementById('statSwordStreak');
   const statGrazeStreakEl = document.getElementById('statGrazeStreak');
   const statCoinsEl = document.getElementById('statCoins');
+  const statPerfectStreakEl = document.getElementById('statPerfectStreak');
+  const statRampFillEl = document.getElementById('statRampFill');
+  const statRampLabelEl = document.getElementById('statRampLabel');
 
   const splashLeaderboardList = document.getElementById('splashLeaderboardList');
   const splashLeaderboardStatus = document.getElementById('splashLeaderboardStatus');
@@ -137,6 +153,22 @@ window.addEventListener('DOMContentLoaded', () => {
   let bestGrazeStreak = 0;
   let bestSwordStreak = 0;
   let pipesClearedThisRun = 0;
+
+  // "Perfect run" — a skill-only streak of pipes cleared without collecting
+  // ANY item (no shield, sword, coin, etc. — pure flying).
+  let perfectRunStreak = 0;
+  let bestPerfectStreak = 0;
+
+  // Rubber-band mercy: if the player dies very early several runs in a row,
+  // ease the difficulty ramp back a notch for the next attempt. Session-only
+  // (not persisted), and eases back off again the moment they clear 5+ pipes.
+  let earlyDeathStreak = 0;
+  let mercyMessagePending = false;
+  function isMercyActive() { return earlyDeathStreak >= 3; }
+
+  // Faint motion-line particles that kick in as the pipe speed ramps up, so
+  // the game visually communicates "getting faster" beyond just the numbers.
+  let windStreaks = [];
 
   // Persistent, per-device progress (localStorage — see note in chat about
   // this not syncing across devices without a real account system).
@@ -505,6 +537,7 @@ window.addEventListener('DOMContentLoaded', () => {
     { icon: '🤏', title: 'Mini Mode', body: 'Shrinks you down to slip through tight gaps!' },
     { icon: '🪶', title: 'Lucky Feather', body: "Saves you from one otherwise-fatal hit. Only holds one at a time!" },
     { icon: '🪙', title: 'Coins', body: 'Collect coins to grow your all-time total, shown on the start screen!' },
+    { icon: '🎯', title: 'Perfect Run', body: 'Clear pipes with zero pickups for a skill-only streak bonus!' },
     { icon: '🛡️+⚔️', title: "Knight's Rampage", body: 'Smashes 6 pipes in a row for +50 points!' },
   ];
 
@@ -653,6 +686,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function collectItem(type) {
     playSound('item');
+    perfectRunStreak = 0;
     if (type === 'shield') {
       if (player.shieldCount < 2) {
         player.shieldCount++;
@@ -726,7 +760,8 @@ window.addEventListener('DOMContentLoaded', () => {
   // Caps out after DIFFICULTY_CAP pipes so it never becomes unwinnable.
   const DIFFICULTY_CAP = 40;
   function difficultyLevel() {
-    return Math.min(pipesClearedThisRun, DIFFICULTY_CAP);
+    const effective = pipesClearedThisRun * (isMercyActive() ? 0.5 : 1);
+    return Math.min(effective, DIFFICULTY_CAP);
   }
 
   function spawnPipe() {
@@ -778,6 +813,28 @@ window.addEventListener('DOMContentLoaded', () => {
       c.x -= (c.speed * (currentSpeed / 2));
       if (c.x + c.size * 2 < 0) c.x = VW + 50;
     });
+
+    // Motion-line particles kick in once the ramp is noticeably underway,
+    // scaling up with difficulty so the game visually "feels" faster.
+    const diff = difficultyLevel();
+    if (diff > 6 && slowMoTimer <= 0 && Math.random() < (diff - 6) * 0.006) {
+      windStreaks.push({
+        x: VW + Math.random() * 60,
+        y: Math.random() * VH,
+        len: (28 + Math.random() * 46) * SCALE,
+        alpha: 0.12 + Math.random() * 0.16
+      });
+    }
+    for (let i = windStreaks.length - 1; i >= 0; i--) {
+      const w = windStreaks[i];
+      w.x -= currentSpeed * 1.7;
+      if (w.x + w.len < 0) windStreaks.splice(i, 1);
+    }
+
+    if (mercyMessagePending && frameCount === 40) {
+      spawnFloatingText("🌈 Taking it easy this round!", player.x - 40, player.y - 55, "#38bdf8");
+      mercyMessagePending = false;
+    }
 
     player.vy += player.gravity;
     player.cy += player.vy;
@@ -845,6 +902,13 @@ window.addEventListener('DOMContentLoaded', () => {
       if (!pipe.passed && pipe.x + pipe.width < player.x) {
         pipe.passed = true;
         pipesClearedThisRun++;
+        perfectRunStreak++;
+        if (perfectRunStreak > bestPerfectStreak) bestPerfectStreak = perfectRunStreak;
+        if (perfectRunStreak > 0 && perfectRunStreak % 8 === 0) {
+          score += 8;
+          playSound('item');
+          spawnFloatingText(`🎯 PERFECT RUN x${perfectRunStreak}! +8`, player.x - 20, player.y - 75, "#22d3ee");
+        }
         if (pipesClearedThisRun % 10 === 0 && pipesClearedThisRun <= DIFFICULTY_CAP) {
           spawnFloatingText("⚡ SPEEDING UP!", player.x - 20, player.y - 60, "#f97316");
         }
@@ -913,6 +977,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function handlePlayerHit(pipe = null) {
     swordStreak = 0;
     grazeStreak = 0;
+    perfectRunStreak = 0;
     if (player.shieldCount > 0) {
       player.shieldCount--;
       playSound('shatter');
@@ -1139,6 +1204,14 @@ window.addEventListener('DOMContentLoaded', () => {
     ctx.fillStyle = currentTheme.background;
     ctx.fillRect(0, 0, VW, VH);
 
+    // Gentle darkening as the ramp progresses — a subtle "getting intense"
+    // cue that stacks with (but doesn't replace) the score-based themes.
+    const intensityAlpha = Math.min(difficultyLevel() / DIFFICULTY_CAP, 1) * 0.22;
+    if (intensityAlpha > 0.01) {
+      ctx.fillStyle = `rgba(10, 10, 30, ${intensityAlpha})`;
+      ctx.fillRect(0, 0, VW, VH);
+    }
+
     ctx.fillStyle = currentTheme.cloudColor;
     clouds.forEach(c => {
       ctx.beginPath();
@@ -1147,6 +1220,18 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.arc(c.x + c.size * 0.6, c.y, c.size * 0.35, 0, Math.PI * 2);
       ctx.fill();
     });
+
+    ctx.save();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2 * SCALE;
+    windStreaks.forEach(w => {
+      ctx.globalAlpha = w.alpha;
+      ctx.beginPath();
+      ctx.moveTo(w.x, w.y);
+      ctx.lineTo(w.x - w.len, w.y);
+      ctx.stroke();
+    });
+    ctx.restore();
 
     pipes.forEach(pipe => drawPipe(pipe));
 
@@ -1291,6 +1376,12 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.fillStyle = "#38bdf8";
       ctx.fillText(`😅 Close-Call Streak: ${grazeStreak}`, pad, hudY);
     }
+    if (perfectRunStreak > 0) {
+      hudY += 20 * SCALE;
+      ctx.font = `600 ${14 * SCALE}px 'Nunito', -apple-system, sans-serif`;
+      ctx.fillStyle = "#22d3ee";
+      ctx.fillText(`🎯 Perfect Streak: ${perfectRunStreak}`, pad, hudY);
+    }
   }
 
   // ===========================================================================
@@ -1301,6 +1392,14 @@ window.addEventListener('DOMContentLoaded', () => {
       stopBackgroundMusic();
       playSound('hit');
       gameOver = true;
+
+      // Rubber-band mercy bookkeeping: track early deaths (under 5 pipes)
+      // in a row so the NEXT run can ease off the ramp a little.
+      if (pipesClearedThisRun < 5) {
+        earlyDeathStreak++;
+      } else {
+        earlyDeathStreak = 0;
+      }
 
       totalCoins += coinsThisRun;
       localStorage.setItem('pixeljump_total_coins', String(totalCoins));
@@ -1332,6 +1431,10 @@ window.addEventListener('DOMContentLoaded', () => {
     if (statSwordStreakEl) statSwordStreakEl.textContent = bestSwordStreak;
     if (statGrazeStreakEl) statGrazeStreakEl.textContent = bestGrazeStreak;
     if (statCoinsEl) statCoinsEl.textContent = `+${coinsThisRun} (Total: ${totalCoins.toLocaleString()})`;
+    if (statPerfectStreakEl) statPerfectStreakEl.textContent = bestPerfectStreak;
+    const rampReached = Math.min(pipesClearedThisRun, DIFFICULTY_CAP);
+    if (statRampLabelEl) statRampLabelEl.textContent = `${rampReached}/${DIFFICULTY_CAP}`;
+    if (statRampFillEl) statRampFillEl.style.width = `${(rampReached / DIFFICULTY_CAP) * 100}%`;
   }
 
   function resetGame() {
@@ -1352,8 +1455,12 @@ window.addEventListener('DOMContentLoaded', () => {
     grazeStreak = 0;
     bestGrazeStreak = 0;
     bestSwordStreak = 0;
+    perfectRunStreak = 0;
+    bestPerfectStreak = 0;
     pipesClearedThisRun = 0;
     coinsThisRun = 0;
+    windStreaks = [];
+    mercyMessagePending = isMercyActive();
     score = 0;
     pipes = [];
     items = [];
