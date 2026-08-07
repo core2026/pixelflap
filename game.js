@@ -1,7 +1,16 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.5.01
+ * Version: v2.6.00
+ *
+ * WHAT CHANGED IN v2.6.00
+ * - Coins now render as a hand-drawn spinning gold coin (gradient body,
+ *   ridge ring, $ mark, glossy highlight) instead of the flat 🪙 emoji.
+ * - Gentle difficulty ramp: the further you get, the faster pipes move,
+ *   the tighter they're spaced, and the narrower the gaps get — all tied
+ *   to pipes actually cleared (not score, so bonus points don't cause
+ *   spikes) and capped after 40 pipes so it never becomes unwinnable.
+ *   A small "Speeding Up!" callout marks each step.
  *
  * WHAT CHANGED IN v2.5.01
  * - Fixed pickup icons being drawn with the default (alphabetic) text
@@ -49,7 +58,7 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.5.01";
+  const GAME_VERSION = "v2.6.00";
 
   // ===========================================================================
   // 0. CONFIG
@@ -712,8 +721,18 @@ window.addEventListener('DOMContentLoaded', () => {
     floatingTexts.push({ text, x, y, alpha: 1.0, vy: -1.2, color });
   }
 
+  // Difficulty ramps gradually with pipes cleared, not raw score, so bonus
+  // points (golden pipes, streaks, combos) don't cause difficulty spikes.
+  // Caps out after DIFFICULTY_CAP pipes so it never becomes unwinnable.
+  const DIFFICULTY_CAP = 40;
+  function difficultyLevel() {
+    return Math.min(pipesClearedThisRun, DIFFICULTY_CAP);
+  }
+
   function spawnPipe() {
-    const gap = Math.max(130 * SCALE, VH * 0.22);
+    const d = difficultyLevel();
+    const baseGap = Math.max(130 * SCALE, VH * 0.22);
+    const gap = Math.max(100 * SCALE, baseGap - d * 0.85 * SCALE);
     const minCenter = gap / 2 + 60 * SCALE;
     const maxCenter = VH - gap / 2 - 60 * SCALE;
 
@@ -747,7 +766,8 @@ window.addEventListener('DOMContentLoaded', () => {
     if (magnetTimer > 0) magnetTimer--;
     if (shrinkTimer > 0) shrinkTimer--;
 
-    const currentSpeed = (slowMoTimer > 0 ? 1.1 : 2.2) * SCALE;
+    const speedRamp = 1 + difficultyLevel() * 0.02; // gradually up to +80% at the cap
+    const currentSpeed = (slowMoTimer > 0 ? 1.1 : 2.2 * speedRamp) * SCALE;
 
     if (score >= 30) currentTheme = THEMES.retro;
     else if (score >= 20) currentTheme = THEMES.night;
@@ -768,7 +788,8 @@ window.addEventListener('DOMContentLoaded', () => {
     player.y = player.cy - player.height / 2;
     if (player.y + player.height >= VH || player.y <= 0) handlePlayerHit();
 
-    const pipeSpawnInterval = (slowMoTimer > 0) ? 220 : 110;
+    const baseInterval = (slowMoTimer > 0) ? 220 : 110;
+    const pipeSpawnInterval = Math.max(78, Math.round(baseInterval - difficultyLevel() * 0.7));
     if (frameCount % pipeSpawnInterval === 0) spawnPipe();
 
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
@@ -824,6 +845,9 @@ window.addEventListener('DOMContentLoaded', () => {
       if (!pipe.passed && pipe.x + pipe.width < player.x) {
         pipe.passed = true;
         pipesClearedThisRun++;
+        if (pipesClearedThisRun % 10 === 0 && pipesClearedThisRun <= DIFFICULTY_CAP) {
+          spawnFloatingText("⚡ SPEEDING UP!", player.x - 20, player.y - 60, "#f97316");
+        }
         const addScore = (scoreMultiplierTimer > 0) ? 2 : 1;
         score += addScore;
         if (scoreMultiplierTimer > 0) spawnFloatingText("+2 PTS 💎", player.x, player.y - 20, "#c084fc");
@@ -1056,6 +1080,61 @@ window.addEventListener('DOMContentLoaded', () => {
     ctx.textBaseline = "alphabetic";
   }
 
+  // Hand-drawn gold coin (radial gradient body, ridge ring, shine, and a
+  // horizontal squish that fakes a slow 3D spin) instead of the flat emoji.
+  function drawCoin(item) {
+    const cx = item.x + item.size / 2;
+    const cy = item.y + item.size / 2;
+    const r = item.size / 2;
+    const spin = Math.abs(Math.sin(frameCount * 0.07 + item.x * 0.02));
+    const rx = r * (0.32 + 0.68 * spin);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    const grad = ctx.createRadialGradient(-rx * 0.3, -r * 0.35, r * 0.1, 0, 0, r);
+    grad.addColorStop(0, "#fff8dc");
+    grad.addColorStop(0.42, "#ffd54f");
+    grad.addColorStop(0.78, "#f2a90d");
+    grad.addColorStop(1, "#a86c05");
+
+    ctx.beginPath();
+    ctx.ellipse(0, 0, Math.max(1.5, rx), r, 0, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.shadowColor = "rgba(245, 158, 11, 0.55)";
+    ctx.shadowBlur = 6 * SCALE;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = Math.max(1, r * 0.14);
+    ctx.strokeStyle = "#a86c05";
+    ctx.stroke();
+
+    // inner ridge ring — reads best near face-on, fades out edge-on
+    if (spin > 0.3) {
+      ctx.globalAlpha = (spin - 0.3) / 0.7;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, Math.max(1, rx * 0.68), r * 0.68, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+      ctx.lineWidth = Math.max(1, r * 0.08);
+      ctx.stroke();
+
+      ctx.font = `700 ${r * 0.95}px 'Baloo 2', sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#a86c05";
+      ctx.fillText("$", 0, r * 0.06);
+      ctx.globalAlpha = 1;
+    }
+
+    // glossy highlight streak
+    ctx.beginPath();
+    ctx.ellipse(-rx * 0.28, -r * 0.32, Math.max(1, rx * 0.26), r * 0.15, -0.4, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+    ctx.fill();
+
+    ctx.restore();
+  }
+
   function draw() {
     ctx.fillStyle = currentTheme.background;
     ctx.fillRect(0, 0, VW, VH);
@@ -1072,10 +1151,14 @@ window.addEventListener('DOMContentLoaded', () => {
     pipes.forEach(pipe => drawPipe(pipe));
 
     items.forEach(item => {
+      if (item.type === 'coin') {
+        drawCoin(item);
+        return;
+      }
       ctx.font = `${24 * SCALE}px sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      const ICONS = { sword: '⚔️', slow: '🐢', gem: '💎', coin: '🪙', magnet: '🧲', shrink: '🤏', feather: '🪶', shield: '🛡️' };
+      const ICONS = { sword: '⚔️', slow: '🐢', gem: '💎', magnet: '🧲', shrink: '🤏', feather: '🪶', shield: '🛡️' };
       ctx.fillText(ICONS[item.type] || '🛡️', item.x + item.size / 2, item.y + item.size / 2);
     });
     ctx.textAlign = "left";
