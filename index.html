@@ -14,7 +14,7 @@
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#3fc7ff">
   <meta name="description" content="PixelJump - a bright, bouncy flap-and-dodge adventure for kids!">
-  <title>PixelJump - v2.8.00</title>
+  <title>PixelJump - v2.9.00</title>
 
   <!--
     =====================================================================
@@ -46,7 +46,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css?v=2.4.0">
+  <link rel="stylesheet" href="style.css?v=2.5.0">
 </head>
 <body>
 
@@ -182,16 +182,25 @@
     </section>
 
     <!-- ============================================================
-         "HOW TO PLAY" INFO MODAL
+         "HOW TO PLAY" ANIMATED TUTORIAL MODAL
+         Only opens when the "How to Play" button is clicked — never shown
+         automatically. Content is driven from game.js (tutorialSteps),
+         which reuses the same GUIDE_SECTIONS data as the gameplay values.
     ============================================================= -->
-    <section id="info-modal" class="overlay hidden" aria-label="How to play">
-      <div class="splash-content modal-content">
-        <h2 class="modal-title">⚔️ Power-Ups &amp; Guide 🛡️</h2>
-        <div class="info-grid" id="infoGrid">
-          <!-- Populated from game.js so the guide text always matches
-               the actual gameplay values (durations, bonus points, etc). -->
+    <section id="info-modal" class="overlay hidden" aria-label="How to play tutorial">
+      <div class="splash-content modal-content tutorial-content">
+        <h2 class="modal-title" id="tutorialTitle">🧭 How to Play</h2>
+
+        <canvas id="tutorialCanvas" class="tutorial-canvas" width="360" height="220" aria-label="Animated gameplay preview"></canvas>
+        <p class="tutorial-caption" id="tutorialCaption">Tap or click anywhere to flap your wings!</p>
+
+        <div class="tutorial-dots" id="tutorialDots" role="tablist" aria-label="Tutorial steps"></div>
+
+        <div class="btn-row">
+          <button type="button" class="btn secondary-btn" id="tutorialPrevBtn">◀ Back</button>
+          <button type="button" class="btn secondary-btn" id="tutorialNextBtn">Next ▶</button>
         </div>
-        <button type="button" class="btn primary-btn" id="closeInfoBtn">Got it!</button>
+        <button type="button" class="btn primary-btn bounce-hover" id="closeInfoBtn">Got it, let's fly! 🚀</button>
       </div>
     </section>
 
@@ -200,5 +209,5 @@
   <!-- Hidden native file input used for uploading a custom avatar photo -->
   <input type="file" id="avatarUpload" accept="image/*" aria-hidden="true">
 
-<script src="game.js?v=2.8.00"></script></body>
+<script src="game.js?v=2.9.00"></script></body>
 </html>

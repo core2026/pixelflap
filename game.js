@@ -1,7 +1,14 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.8.00
+ * Version: v2.9.00
+ *
+ * WHAT CHANGED IN v2.9.00
+ * - "How to Play" is now an animated, click-to-open tutorial instead of a
+ *   static text grid: a small canvas cycles through mini-scenes (flap
+ *   timing, dodging pipes, then each power-up bouncing/spinning with its
+ *   description) with Prev/Next controls and step dots. Still only opens
+ *   when the button is clicked — never shown automatically.
  *
  * WHAT CHANGED IN v2.8.00
  * - Difficulty presets: Easy / Normal / Hard, selectable on the splash
@@ -79,7 +86,7 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.8.00";
+  const GAME_VERSION = "v2.9.00";
 
   // ===========================================================================
   // 0. CONFIG
@@ -134,7 +141,11 @@ window.addEventListener('DOMContentLoaded', () => {
   const splashLeaderboardStatus = document.getElementById('splashLeaderboardStatus');
   const gameOverLeaderboardList = document.getElementById('gameOverLeaderboardList');
   const gameOverLeaderboardStatus = document.getElementById('gameOverLeaderboardStatus');
-  const infoGrid = document.getElementById('infoGrid');
+  const tutorialCanvas = document.getElementById('tutorialCanvas');
+  const tutorialCaption = document.getElementById('tutorialCaption');
+  const tutorialDots = document.getElementById('tutorialDots');
+  const tutorialPrevBtn = document.getElementById('tutorialPrevBtn');
+  const tutorialNextBtn = document.getElementById('tutorialNextBtn');
 
   const startGameBtn = document.getElementById('startGameBtn');
   const howToPlayBtn = document.getElementById('howToPlayBtn');
@@ -610,14 +621,153 @@ window.addEventListener('DOMContentLoaded', () => {
     { icon: '🛡️+⚔️', title: "Knight's Rampage", body: 'Smashes 6 pipes in a row for +50 points!' },
   ];
 
-  function buildInfoGrid() {
-    infoGrid.innerHTML = '';
-    GUIDE_SECTIONS.forEach(sec => {
-      const div = document.createElement('div');
-      div.className = 'info-item';
-      div.innerHTML = `<span class="icon">${sec.icon}</span><div><strong>${sec.title}</strong><small>${sec.body}</small></div>`;
-      infoGrid.appendChild(div);
+  // ===========================================================================
+  // 8b. ANIMATED TUTORIAL (only opens when "How to Play" is clicked)
+  // ===========================================================================
+  const tutorialCtx = tutorialCanvas ? tutorialCanvas.getContext('2d') : null;
+  const TUTORIAL_STEPS = [
+    { kind: 'flap', caption: "Tap or click anywhere to flap your wings and stay airborne!" },
+    { kind: 'dodge', caption: "Fly through the gaps between pipes — don't touch them!" },
+    ...GUIDE_SECTIONS.map(sec => ({ kind: 'icon', icon: sec.icon, caption: `${sec.title}: ${sec.body}` })),
+  ];
+  let tutorialIndex = 0;
+  let tutorialFrame = 0;
+  let tutorialRAF = null;
+  let tutorialAutoTimer = null;
+
+  function buildTutorialDots() {
+    if (!tutorialDots) return;
+    tutorialDots.innerHTML = '';
+    TUTORIAL_STEPS.forEach((_, i) => {
+      const dot = document.createElement('button');
+      dot.type = 'button';
+      dot.className = 'tutorial-dot';
+      dot.setAttribute('aria-label', `Tutorial step ${i + 1}`);
+      dot.addEventListener('click', () => goToTutorialStep(i));
+      tutorialDots.appendChild(dot);
     });
+  }
+
+  function goToTutorialStep(i) {
+    tutorialIndex = (i + TUTORIAL_STEPS.length) % TUTORIAL_STEPS.length;
+    tutorialFrame = 0;
+    if (tutorialCaption) tutorialCaption.textContent = TUTORIAL_STEPS[tutorialIndex].caption;
+    if (tutorialDots) {
+      tutorialDots.querySelectorAll('.tutorial-dot').forEach((dot, idx) => {
+        dot.classList.toggle('active', idx === tutorialIndex);
+      });
+    }
+    restartTutorialAutoAdvance();
+  }
+
+  function restartTutorialAutoAdvance() {
+    if (tutorialAutoTimer) clearTimeout(tutorialAutoTimer);
+    tutorialAutoTimer = setTimeout(() => goToTutorialStep(tutorialIndex + 1), 4200);
+  }
+
+  // Small, self-contained canvas mini-scenes — independent of the main game
+  // loop so they can run while the game itself is paused behind the modal.
+  function drawTutorialFrame() {
+    if (!tutorialCtx) return;
+    const w = tutorialCanvas.width, h = tutorialCanvas.height;
+    const t = tutorialFrame;
+    const step = TUTORIAL_STEPS[tutorialIndex];
+
+    const sky = tutorialCtx.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0, "#38bdf8");
+    sky.addColorStop(1, "#8fe3ff");
+    tutorialCtx.fillStyle = sky;
+    tutorialCtx.fillRect(0, 0, w, h);
+
+    const drawBird = (x, y, size = 26) => {
+      tutorialCtx.font = `${size}px sans-serif`;
+      tutorialCtx.textAlign = "center";
+      tutorialCtx.textBaseline = "middle";
+      tutorialCtx.fillText("🐥", x, y);
+    };
+
+    if (step.kind === 'flap') {
+      const cycle = t % 70;
+      const bob = Math.sin((t % 70) / 70 * Math.PI * 2) * -22;
+      const y = h / 2 + bob;
+      drawBird(w * 0.5, y, 30);
+      // "TAP!" pulse ring right before each flap
+      const pulse = cycle < 12 ? (12 - cycle) / 12 : 0;
+      if (pulse > 0) {
+        tutorialCtx.globalAlpha = pulse * 0.6;
+        tutorialCtx.beginPath();
+        tutorialCtx.arc(w * 0.5, y, 30 + (12 - pulse * 12) * 2, 0, Math.PI * 2);
+        tutorialCtx.strokeStyle = "#fff";
+        tutorialCtx.lineWidth = 3;
+        tutorialCtx.stroke();
+        tutorialCtx.globalAlpha = 1;
+      }
+    } else if (step.kind === 'dodge') {
+      const speed = 1.6;
+      const gapH = 70;
+      const cycleW = 170;
+      const scrollX = w - ((t * speed) % cycleW);
+      const gapCenter = h / 2 + Math.sin(t * 0.03) * 30;
+      tutorialCtx.fillStyle = "#8b5cf6";
+      tutorialCtx.fillRect(scrollX, 0, 34, gapCenter - gapH / 2);
+      tutorialCtx.fillRect(scrollX, gapCenter + gapH / 2, 34, h - (gapCenter + gapH / 2));
+      const birdX = w * 0.28;
+      const birdY = gapCenter + Math.sin(t * 0.12) * (gapH * 0.18);
+      drawBird(birdX, birdY, 26);
+    } else if (step.kind === 'icon') {
+      const bob = Math.sin(t * 0.06) * 8;
+      const spin = Math.sin(t * 0.05) * 0.15;
+      tutorialCtx.save();
+      tutorialCtx.translate(w / 2, h / 2 + bob);
+      tutorialCtx.rotate(spin);
+      tutorialCtx.font = "56px sans-serif";
+      tutorialCtx.textAlign = "center";
+      tutorialCtx.textBaseline = "middle";
+      tutorialCtx.shadowColor = "rgba(255, 213, 79, 0.7)";
+      tutorialCtx.shadowBlur = 14;
+      tutorialCtx.fillText(step.icon, 0, 0);
+      tutorialCtx.restore();
+      // gentle sparkle orbit
+      for (let i = 0; i < 3; i++) {
+        const a = t * 0.04 + (i * Math.PI * 2) / 3;
+        const sx = w / 2 + Math.cos(a) * 60;
+        const sy = h / 2 + bob + Math.sin(a) * 34;
+        tutorialCtx.globalAlpha = 0.7;
+        tutorialCtx.font = "14px sans-serif";
+        tutorialCtx.textAlign = "center";
+        tutorialCtx.fillText("✨", sx, sy);
+        tutorialCtx.globalAlpha = 1;
+      }
+    }
+  }
+
+  function tutorialLoop() {
+    tutorialFrame++;
+    drawTutorialFrame();
+    tutorialRAF = requestAnimationFrame(tutorialLoop);
+  }
+
+  function startTutorialLoop() {
+    stopTutorialLoop();
+    tutorialRAF = requestAnimationFrame(tutorialLoop);
+  }
+
+  function stopTutorialLoop() {
+    if (tutorialRAF) cancelAnimationFrame(tutorialRAF);
+    tutorialRAF = null;
+    if (tutorialAutoTimer) clearTimeout(tutorialAutoTimer);
+    tutorialAutoTimer = null;
+  }
+
+  function openTutorial() {
+    infoModal.classList.remove('hidden');
+    goToTutorialStep(0);
+    startTutorialLoop();
+  }
+
+  function closeTutorial() {
+    infoModal.classList.add('hidden');
+    stopTutorialLoop();
   }
 
   // ===========================================================================
@@ -660,9 +810,11 @@ window.addEventListener('DOMContentLoaded', () => {
     startBackgroundMusic();
   });
 
-  howToPlayBtn.addEventListener('click', () => infoModal.classList.remove('hidden'));
-  closeInfoBtn.addEventListener('click', () => infoModal.classList.add('hidden'));
-  infoModal.addEventListener('click', (e) => { if (e.target === infoModal) infoModal.classList.add('hidden'); });
+  howToPlayBtn.addEventListener('click', openTutorial);
+  closeInfoBtn.addEventListener('click', closeTutorial);
+  infoModal.addEventListener('click', (e) => { if (e.target === infoModal) closeTutorial(); });
+  if (tutorialPrevBtn) tutorialPrevBtn.addEventListener('click', () => goToTutorialStep(tutorialIndex - 1));
+  if (tutorialNextBtn) tutorialNextBtn.addEventListener('click', () => goToTutorialStep(tutorialIndex + 1));
 
   muteBtn.addEventListener('click', () => {
     audioMuted = !audioMuted;
@@ -696,7 +848,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (e.code === 'Space' || e.code === 'ArrowUp') {
       e.preventDefault();
       if (!infoModal.classList.contains('hidden')) {
-        infoModal.classList.add('hidden');
+        closeTutorial();
         return;
       }
       if (!gameStarted) {
@@ -1558,7 +1710,7 @@ window.addEventListener('DOMContentLoaded', () => {
   player.y = player.cy - player.height / 2;
   syncInitialsInput();
   buildAvatarSelector();
-  buildInfoGrid();
+  buildTutorialDots();
   updateCoinBadge();
   initDifficultySelector();
   fetchLeaderboard();
