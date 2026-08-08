@@ -1,6 +1,6 @@
 /* =========================================================================
    PixelJump Stylesheet
-   Version: v2.8.0
+   Version: v2.9.0
 
    AI / DEVELOPER EDITING REQUIREMENT:
    Any assistant or developer who edits this file MUST bump the version
@@ -652,6 +652,64 @@ input[type="text"].invalid {
   height: 1em;
   vertical-align: -0.15em;
   display: inline-block;
+}
+
+/* -------------------------------------------------------------------------
+   "Add to Home Screen" install banner — fixed to the bottom, above any
+   safe-area inset (home indicator / gesture bar).
+------------------------------------------------------------------------- */
+.install-banner {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: max(12px, var(--safe-bottom));
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 3px solid var(--card-border);
+  border-radius: 16px;
+  padding: 10px 12px;
+  box-shadow: var(--shadow-soft);
+  animation: slideUp 0.3s ease;
+}
+
+.install-banner-text {
+  flex: 1;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+.install-cta {
+  flex: 0 0 auto;
+  background: linear-gradient(180deg, var(--candy-pink), #ff4f91);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.install-close {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  color: var(--ink);
+  opacity: 0.5;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 /* -------------------------------------------------------------------------

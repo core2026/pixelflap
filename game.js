@@ -1,7 +1,19 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.13.01
+ * Version: v3.0.00
+ *
+ * WHAT CHANGED IN v3.0.00
+ * - PWA support: PixelJump can now be installed to the home screen as a
+ *   standalone app (manifest.json + sw.js service worker for offline asset
+ *   caching). New consistent bird-mascot icon set (replacing the old emoji
+ *   favicon) used everywhere — browser tab, home-screen icon, and iOS
+ *   Add-to-Home-Screen icon.
+ * - A dismissible in-app banner now guides players to install: a real
+ *   "Install" button on Android/Chrome (via the beforeinstallprompt API),
+ *   or step-by-step Share-sheet instructions on iOS (which has no
+ *   programmatic install API). Never shown if already installed or
+ *   previously dismissed, and only appears on the splash screen.
  *
  * WHAT CHANGED IN v2.13.01
  * - The coin emoji (🪙) was also rendering unreliably (as an unrelated
@@ -40,105 +52,12 @@
  *   file (even committing to GitHub) does not update the live Cloudflare
  *   Worker — it must be manually redeployed (dashboard or wrangler).
  *
- * WHAT CHANGED IN v2.11.00
- * - Coin-buyable revive: if you die with no shield or feather left, and
- *   have at least 20 banked coins, you're offered one revive per run —
- *   spend the coins to keep flying (with a brief grace shield so momentum
- *   doesn't carry you straight back into the same pipe), or end the run.
- * - Fixed: pressing Space/Up (or tapping) during the new-personal-best
- *   kill-cam no longer skips straight to "Play Again" — it now fast-forwards
- *   the celebration instead, like tapping through a cutscene.
- *
- * WHAT CHANGED IN v2.10.00
- * - Slow-mo "kill cam": when a run ends with a new personal best, the death
- *   frame freezes for a beat while a confetti burst and a bouncy "NEW BEST!"
- *   callout play, before the game-over screen reveals. Regular (non-best)
- *   deaths go straight to the game-over screen as before.
- *
- * WHAT CHANGED IN v2.9.00
- * - "How to Play" is now an animated, click-to-open tutorial instead of a
- *   static text grid: a small canvas cycles through mini-scenes (flap
- *   timing, dodging pipes, then each power-up bouncing/spinning with its
- *   description) with Prev/Next controls and step dots. Still only opens
- *   when the button is clicked — never shown automatically.
- *
- * WHAT CHANGED IN v2.8.00
- * - Difficulty presets: Easy / Normal / Hard, selectable on the splash
- *   screen. Each tunes base pipe speed, gap size, and how fast the ramp
- *   tightens up. Choice is remembered between visits.
- * - High scores, personal bests, and the leaderboard are now tracked
- *   separately per difficulty (both locally and via the backend — see
- *   index.js for the required one-time database migration).
- *
- * WHAT CHANGED IN v2.7.00
- * - Visual difficulty cues: a subtle screen darkening plus faint motion-line
- *   particles kick in as the speed ramp progresses, so it *feels* faster,
- *   not just runs faster.
- * - Perfect Run streak: a skill-only bonus for clearing pipes in a row
- *   without collecting ANY item (+8 every 8 in a row). Breaks the moment
- *   you grab a pickup or take a hit.
- * - Rubber-band mercy: three early deaths (under 5 pipes) in a row eases
- *   the difficulty ramp back for the next attempt, with a small friendly
- *   callout. Resets the moment a run clears 5+ pipes. Session-only.
- * - Game-over stats panel now shows Best Perfect Streak and a "Speed
- *   Reached" progress bar showing how far into the 40-pipe ramp you got.
- *
- * WHAT CHANGED IN v2.6.00
- * - Coins now render as a hand-drawn spinning gold coin (gradient body,
- *   ridge ring, $ mark, glossy highlight) instead of the flat 🪙 emoji.
- * - Gentle difficulty ramp: the further you get, the faster pipes move,
- *   the tighter they're spaced, and the narrower the gaps get — all tied
- *   to pipes actually cleared (not score, so bonus points don't cause
- *   spikes) and capped after 40 pipes so it never becomes unwinnable.
- *   A small "Speeding Up!" callout marks each step.
- *
- * WHAT CHANGED IN v2.5.01
- * - Fixed pickup icons being drawn with the default (alphabetic) text
- *   baseline, which anchors differently per-glyph — on iPadOS the shield
- *   emoji rendered noticeably taller than the others and could clip against
- *   the canvas edge. Icons are now centered on their own bounding box.
- * - Lowered the Turtle Time (slow-mo) drop rate — it was showing up too often.
- *
- * WHAT CHANGED IN v2.5.00
- * - Near-miss "close call" bonus: skim past a pipe without touching it and
- *   bank a growing bonus for chaining close calls.
- * - Magnet power-up: pulls nearby items toward the player for a few seconds.
- * - Mini Mode power-up: temporarily shrinks the player to slip through
- *   tight gaps (player position now tracked from its center so this scales
- *   symmetrically).
- * - Lucky Feather power-up: saves you from one otherwise-fatal hit, once.
- * - Coins: a simple persistent currency (saved per-device via
- *   localStorage) shown on the splash screen and tallied after each run.
- * - Game-over screen now shows an easy-to-scan stats panel (personal best,
- *   pipes cleared, best streaks, coins earned) right next to the score.
- *
- * WHAT CHANGED IN v2.4.00
- * - Rare golden pipes: still fly through the gap, but clearing one banks a
- *   +5 point bonus and a sparkle callout.
- * - Sword-kill streak meter: chaining pipe slices without getting hit builds
- *   a streak, with a bonus +10 every 5 in a row. Any hit resets it.
- * - Spinning sword blades now leave a brief golden particle trail as they
- *   orbit the player.
- *
- * WHAT CHANGED IN v2.3.00
- * - Pipe gaps no longer swing straight from floor to ceiling back-to-back;
- *   each new gap is clamped near the previous one's height.
- * - Reworked pipe art: rounded gradient "crystal pillar" pipes with glowing
- *   gem caps and shimmer facets, replacing the flat green Flappy-Bird-style
- *   pipes. Each theme now has its own pipe palette (no more plain green).
- * - Sword pickup now grants a real spinning sword: orbiting blades shatter
- *   any pipe the player touches (consuming a charge) instead of ending the
- *   run. Picking up a Shield while carrying a sword (or vice versa) still
- *   triggers the Knight's Aegis giant-shield combo as before.
- *
- * WHAT CHANGED IN v2.2.00
- * - Added pure JS 8-bit retro background music synth loop using Web Audio API.
- * - Dynamic music tempo that slows down during Turtle Time!
+ * (Earlier history trimmed for length — see project README/git history.)
  * =============================================================================
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.13.01";
+  const GAME_VERSION = "v3.0.00";
 
   // ===========================================================================
   // 0. CONFIG
@@ -218,6 +137,11 @@ window.addEventListener('DOMContentLoaded', () => {
   const closeShopBtn = document.getElementById('closeShopBtn');
   const shopList = document.getElementById('shopList');
   const shopCoinBalance = document.getElementById('shopCoinBalance');
+
+  const installBanner = document.getElementById('installBanner');
+  const installBannerText = document.getElementById('installBannerText');
+  const installBannerBtn = document.getElementById('installBannerBtn');
+  const installBannerClose = document.getElementById('installBannerClose');
 
   // ===========================================================================
   // 2. STATE
@@ -1039,6 +963,7 @@ window.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('pixeljump_initials', playerInitials);
     initAudio();
     gameStarted = true;
+    dismissInstallBanner(false);
     showScreen('game');
     resetGame();
     startBackgroundMusic();
@@ -1074,12 +999,14 @@ window.addEventListener('DOMContentLoaded', () => {
     gameStarted = false;
     gameOver = false;
     showScreen('splash');
+    maybeShowInstallBanner();
   });
 
   playAgainBtn.addEventListener('click', () => {
     initAudio();
     resetGame();
     gameStarted = true;
+    dismissInstallBanner(false);
     showScreen('game');
     startBackgroundMusic();
   });
@@ -2131,6 +2058,80 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ===========================================================================
+  // 13b. PWA — INSTALL BANNER & SERVICE WORKER
+  // ===========================================================================
+  // Two very different install paths:
+  //  - Android/Chrome-family browsers fire `beforeinstallprompt`, which we
+  //    capture and trigger from our own "Install" button (native browsers
+  //    also show their own install UI elsewhere, e.g. the 3-dot menu, but
+  //    a bespoke button surfaces it sooner and more clearly for kids).
+  //  - iOS Safari has no programmatic install API at all — the only way is
+  //    Share ▸ Add to Home Screen — so we show instructions instead of a
+  //    button, since there's nothing to actually trigger.
+  let deferredInstallPrompt = null;
+
+  function isStandaloneDisplay() {
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  }
+
+  function isIOSDevice() {
+    return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+  }
+
+  function dismissInstallBanner(remember) {
+    if (installBanner) installBanner.classList.add('hidden');
+    if (remember) localStorage.setItem('pixeljump_install_dismissed', '1');
+  }
+
+  function maybeShowInstallBanner() {
+    if (!installBanner || gameStarted) return; // only ever on the splash screen
+    if (isStandaloneDisplay()) return; // already installed
+    if (localStorage.getItem('pixeljump_install_dismissed')) return; // said no thanks before
+
+    if (deferredInstallPrompt) {
+      installBannerText.textContent = "📲 Install PixelJump for the best experience!";
+      installBannerBtn.classList.remove('hidden');
+      installBanner.classList.remove('hidden');
+    } else if (isIOSDevice()) {
+      installBannerText.textContent = '📲 Add PixelJump to your Home Screen! Tap Share, then "Add to Home Screen".';
+      installBannerBtn.classList.add('hidden');
+      installBanner.classList.remove('hidden');
+    }
+    // Other browsers (desktop, or Android browsers without install support):
+    // no reliable manual path to describe, so stay quiet rather than guess.
+  }
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    maybeShowInstallBanner();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    dismissInstallBanner(true);
+  });
+
+  if (installBannerBtn) {
+    installBannerBtn.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      try { await deferredInstallPrompt.userChoice; } catch (e) { }
+      deferredInstallPrompt = null;
+      dismissInstallBanner(true);
+    });
+  }
+  if (installBannerClose) {
+    installBannerClose.addEventListener('click', () => dismissInstallBanner(true));
+  }
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+
+  // ===========================================================================
   // 14. BOOTSTRAP
   // ===========================================================================
   resizeCanvas();
@@ -2144,5 +2145,6 @@ window.addEventListener('DOMContentLoaded', () => {
   updateCoinBadge();
   initDifficultySelector();
   fetchLeaderboard();
+  setTimeout(maybeShowInstallBanner, 1500); // let the splash settle first
   gameLoop();
 });
