@@ -1,7 +1,14 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.12.00
+ * Version: v2.12.01
+ *
+ * WHAT CHANGED IN v2.12.01
+ * - Fixed the coin emoji (🪙) rendering unreliably in canvas text — it could
+ *   fall back to an unrelated glyph (looking like a crescent moon) on some
+ *   systems. The in-game HUD coin count, the "How to Play" coin slide, and
+ *   the coin-pickup floating text now all use a small drawn coin graphic
+ *   (or plain text) instead of relying on that emoji glyph in canvas.
  *
  * WHAT CHANGED IN v2.12.00
  * - Simple Shop (splash screen → 🛒 Shop): spend banked coins on cosmetic
@@ -111,7 +118,7 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.12.00";
+  const GAME_VERSION = "v2.12.01";
 
   // ===========================================================================
   // 0. CONFIG
@@ -881,16 +888,20 @@ window.addEventListener('DOMContentLoaded', () => {
     } else if (step.kind === 'icon') {
       const bob = Math.sin(t * 0.06) * 8;
       const spin = Math.sin(t * 0.05) * 0.15;
-      tutorialCtx.save();
-      tutorialCtx.translate(w / 2, h / 2 + bob);
-      tutorialCtx.rotate(spin);
-      tutorialCtx.font = "56px sans-serif";
-      tutorialCtx.textAlign = "center";
-      tutorialCtx.textBaseline = "middle";
-      tutorialCtx.shadowColor = "rgba(255, 213, 79, 0.7)";
-      tutorialCtx.shadowBlur = 14;
-      tutorialCtx.fillText(step.icon, 0, 0);
-      tutorialCtx.restore();
+      if (step.icon === '🪙') {
+        drawMiniCoin(w / 2, h / 2 + bob, 32, tutorialCtx);
+      } else {
+        tutorialCtx.save();
+        tutorialCtx.translate(w / 2, h / 2 + bob);
+        tutorialCtx.rotate(spin);
+        tutorialCtx.font = "56px sans-serif";
+        tutorialCtx.textAlign = "center";
+        tutorialCtx.textBaseline = "middle";
+        tutorialCtx.shadowColor = "rgba(255, 213, 79, 0.7)";
+        tutorialCtx.shadowBlur = 14;
+        tutorialCtx.fillText(step.icon, 0, 0);
+        tutorialCtx.restore();
+      }
       // gentle sparkle orbit
       for (let i = 0; i < 3; i++) {
         const a = t * 0.04 + (i * Math.PI * 2) / 3;
@@ -1109,7 +1120,7 @@ window.addEventListener('DOMContentLoaded', () => {
     } else if (type === 'coin') {
       coinsThisRun++;
       score += 1;
-      spawnFloatingText("🪙 +1 COIN", player.x, player.y - 15, "#fbbf24");
+      spawnFloatingText("+1 COIN", player.x, player.y - 15, "#fbbf24");
     } else if (type === 'magnet') {
       magnetTimer = 420;
       spawnFloatingText("🧲 MAGNET ON!", player.x, player.y - 15, "#38bdf8");
@@ -1666,6 +1677,32 @@ window.addEventListener('DOMContentLoaded', () => {
     ctx.restore();
   }
 
+  // Small static gold-coin icon (no spin) for inline use next to HUD text,
+  // floating-text popups, etc. The 🪙 emoji glyph doesn't render reliably
+  // via canvas fillText on every platform — this avoids that entirely.
+  function drawMiniCoin(cx, cy, r, targetCtx = ctx) {
+    targetCtx.save();
+    targetCtx.translate(cx, cy);
+    const grad = targetCtx.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.1, 0, 0, r);
+    grad.addColorStop(0, "#fff8dc");
+    grad.addColorStop(0.42, "#ffd54f");
+    grad.addColorStop(0.78, "#f2a90d");
+    grad.addColorStop(1, "#a86c05");
+    targetCtx.beginPath();
+    targetCtx.arc(0, 0, r, 0, Math.PI * 2);
+    targetCtx.fillStyle = grad;
+    targetCtx.fill();
+    targetCtx.lineWidth = Math.max(1, r * 0.16);
+    targetCtx.strokeStyle = "#a86c05";
+    targetCtx.stroke();
+    targetCtx.font = `700 ${r * 1.1}px 'Baloo 2', sans-serif`;
+    targetCtx.textAlign = "center";
+    targetCtx.textBaseline = "middle";
+    targetCtx.fillStyle = "#a86c05";
+    targetCtx.fillText("$", 0, r * 0.08);
+    targetCtx.restore();
+  }
+
   function draw() {
     ctx.fillStyle = currentTheme.background;
     ctx.fillRect(0, 0, VW, VH);
@@ -1800,9 +1837,12 @@ window.addEventListener('DOMContentLoaded', () => {
     if (player.shieldCount > 0) invStatus += `🛡️ x${player.shieldCount} `;
     if (player.inventory.sword) invStatus += `⚔️ x${player.inventory.swordCharges} `;
     if (hasFeather) invStatus += `🪶 `;
-    invStatus += `🪙 ${coinsThisRun}`;
     ctx.font = `${14 * SCALE}px 'Nunito', -apple-system, sans-serif`;
     ctx.fillText(invStatus, pad, hudY);
+    const invStatusWidth = ctx.measureText(invStatus).width;
+    const coinIconR = 7 * SCALE;
+    drawMiniCoin(pad + invStatusWidth + coinIconR, hudY - coinIconR * 0.7, coinIconR);
+    ctx.fillText(`${coinsThisRun}`, pad + invStatusWidth + coinIconR * 2 + 4 * SCALE, hudY);
 
     if (slowMoTimer > 0) {
       hudY += 20 * SCALE;
