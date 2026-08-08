@@ -1,7 +1,19 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.12.01
+ * Version: v2.13.00
+ *
+ * WHAT CHANGED IN v2.13.00
+ * - Fixed a real gap where "Play Again" restarted background music without
+ *   first re-checking/resuming the audio context (unlike "Start Game",
+ *   which did) — if the browser had suspended it in the meantime (e.g.
+ *   after browsing the Shop), music could silently fail to come back.
+ *   startBackgroundMusic() now also defensively resumes the context itself
+ *   as a safety net regardless of caller.
+ * - Each equipped pipe skin now has its own background music: Classic
+ *   Crystal keeps the original chiptune run, Candy Cane is bouncier/faster,
+ *   Galaxy is slower and dreamier (sine wave, lower register), and Golden
+ *   plays a bright triumphant fanfare (triangle wave).
  *
  * WHAT CHANGED IN v2.12.01
  * - Fixed the coin emoji (🪙) rendering unreliably in canvas text — it could
@@ -118,7 +130,7 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.12.01";
+  const GAME_VERSION = "v2.13.00";
 
   // ===========================================================================
   // 0. CONFIG
@@ -283,15 +295,15 @@ window.addEventListener('DOMContentLoaded', () => {
   // ===========================================================================
   const SHOP_ITEMS = [
     { id: 'skin_classic', type: 'pipeSkin', name: 'Classic Crystal', icon: '💎', cost: 0,
-      desc: 'The default look — changes with time of day.', palette: null },
+      desc: 'The default look and tune — changes with time of day.', palette: null },
     { id: 'skin_candy', type: 'pipeSkin', name: 'Candy Cane', icon: '🍬', cost: 50,
-      desc: 'Sweet red & white striped pipes.',
+      desc: 'Sweet red & white pipes with a bouncier tune.',
       palette: { pipeColor: '#ef4444', pipeAccent: '#b91c1c', pipeHighlight: '#fecaca', pipeCap: '#ffffff' } },
     { id: 'skin_galaxy', type: 'pipeSkin', name: 'Galaxy', icon: '🌌', cost: 75,
-      desc: 'Deep-space pipes with starry gold caps.',
+      desc: 'Deep-space pipes with a slower, dreamier tune.',
       palette: { pipeColor: '#4c1d95', pipeAccent: '#2e1065', pipeHighlight: '#c4b5fd', pipeCap: '#facc15' } },
     { id: 'skin_gold', type: 'pipeSkin', name: 'Golden', icon: '🏆', cost: 120,
-      desc: 'All-gold pipes for high rollers.',
+      desc: 'All-gold pipes with a triumphant fanfare tune.',
       palette: { pipeColor: '#f59e0b', pipeAccent: '#b45309', pipeHighlight: '#fef3c7', pipeCap: '#fde047' } },
     { id: 'sparkleTrail', type: 'trail', name: 'Sparkle Trail', icon: '✨', cost: 60,
       desc: 'Leave a shimmering trail as you fly.' },
@@ -314,6 +326,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function openShop() {
+    initAudio();
     renderShopList();
     if (shopModal) shopModal.classList.remove('hidden');
   }
@@ -414,13 +427,48 @@ window.addEventListener('DOMContentLoaded', () => {
   let bgmInterval = null;
   let bgmNoteIndex = 0;
 
-  // Old-school 8-bit arcade melody line (frequencies in Hz)
-  const RETRO_MELODY = [
-    261.63, 329.63, 392.00, 523.25, 392.00, 329.63,
-    293.66, 349.23, 440.00, 587.33, 440.00, 349.23,
-    329.63, 392.00, 493.88, 659.25, 493.88, 392.00,
-    349.23, 440.00, 523.25, 698.46, 523.25, 440.00
-  ];
+  // Each equipped pipe skin gets its own 8-bit melody, waveform, and tempo,
+  // so buying/equipping a cosmetic actually changes what you hear too.
+  const MUSIC_THEMES = {
+    // Classic Crystal — the original chiptune arcade run
+    skin_classic: {
+      waveform: 'square',
+      tempoMs: 180,
+      melody: [
+        261.63, 329.63, 392.00, 523.25, 392.00, 329.63,
+        293.66, 349.23, 440.00, 587.33, 440.00, 349.23,
+        329.63, 392.00, 493.88, 659.25, 493.88, 392.00,
+        349.23, 440.00, 523.25, 698.46, 523.25, 440.00
+      ]
+    },
+    // Candy Cane — bouncier, skippier major-scale run
+    skin_candy: {
+      waveform: 'square',
+      tempoMs: 150,
+      melody: [
+        261.63, 293.66, 329.63, 392.00, 440.00, 392.00, 329.63, 293.66,
+        349.23, 392.00, 440.00, 523.25, 587.33, 523.25, 440.00, 392.00
+      ]
+    },
+    // Galaxy — slower, dreamier, lower register
+    skin_galaxy: {
+      waveform: 'sine',
+      tempoMs: 240,
+      melody: [
+        220.00, 261.63, 293.66, 329.63, 392.00, 329.63, 293.66, 261.63,
+        196.00, 220.00, 261.63, 293.66, 349.23, 293.66, 261.63, 220.00
+      ]
+    },
+    // Golden — bright, triumphant fanfare arpeggios
+    skin_gold: {
+      waveform: 'triangle',
+      tempoMs: 170,
+      melody: [
+        261.63, 329.63, 392.00, 523.25, 659.25, 523.25, 392.00, 329.63,
+        349.23, 440.00, 523.25, 698.46, 880.00, 698.46, 523.25, 440.00
+      ]
+    },
+  };
 
   function initAudio() {
     if (!audioCtx) audioCtx = new AudioCtx();
@@ -431,7 +479,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function startBackgroundMusic() {
     if (bgmInterval || audioMuted || !audioCtx) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
 
+    const theme = MUSIC_THEMES[equippedSkin] || MUSIC_THEMES.skin_classic;
     bgmNoteIndex = 0;
     bgmInterval = setInterval(() => {
       if (audioMuted || !gameStarted || gameOver) {
@@ -445,11 +495,10 @@ window.addEventListener('DOMContentLoaded', () => {
         osc.connect(gain);
         gain.connect(audioCtx.destination);
 
-        // Square wave creates the iconic NES / GameBoy sound
-        osc.type = 'square';
-        const freq = RETRO_MELODY[bgmNoteIndex % RETRO_MELODY.length];
-
-        const noteDuration = slowMoTimer > 0 ? 0.25 : 0.14;
+        osc.type = theme.waveform;
+        const freq = theme.melody[bgmNoteIndex % theme.melody.length];
+        const baseDuration = theme.tempoMs / 1000;
+        const noteDuration = slowMoTimer > 0 ? baseDuration * 1.4 : baseDuration * 0.78;
 
         osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
         gain.gain.setValueAtTime(0.04, audioCtx.currentTime); // Soft background volume
@@ -460,7 +509,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
         bgmNoteIndex++;
       } catch (e) { }
-    }, 180);
+    }, theme.tempoMs);
   }
 
   function stopBackgroundMusic() {
@@ -1018,6 +1067,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   playAgainBtn.addEventListener('click', () => {
+    initAudio();
     resetGame();
     gameStarted = true;
     showScreen('game');
