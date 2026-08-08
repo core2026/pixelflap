@@ -3,6 +3,26 @@
  * Interacts with Cloudflare D1 Database (env.DB)
  *
  * =============================================================================
+ * ⚠️  AI / DEVELOPER NOTE — DEPLOYMENT IS A SEPARATE STEP FROM EDITING
+ * =============================================================================
+ * This file is only source code sitting in a repo/download — editing it
+ * (even committing it to GitHub) does NOT update the live Worker that
+ * game.js actually talks to. Cloudflare does not auto-deploy from GitHub
+ * unless Git integration is explicitly configured for this Worker.
+ *
+ * After ANY change to this file, it must be deployed to Cloudflare before
+ * it takes effect, e.g. one of:
+ *   - Cloudflare dashboard → Workers & Pages → this Worker → Edit Code →
+ *     paste the updated file → Save and Deploy
+ *   - `wrangler deploy` from the project directory (with the local file
+ *     matching this one)
+ *
+ * When Claude/an AI assistant modifies this file in a future session, it
+ * should explicitly flag that a manual Cloudflare deployment (dashboard or
+ * wrangler) is required afterward — editing the file alone is not enough.
+ * =============================================================================
+ *
+ * =============================================================================
  * ONE-TIME MIGRATION REQUIRED before deploying this version
  * =============================================================================
  * This version adds per-difficulty leaderboards. Existing "leaderboard"

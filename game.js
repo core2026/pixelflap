@@ -1,7 +1,17 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.11.00
+ * Version: v2.12.00
+ *
+ * WHAT CHANGED IN v2.12.00
+ * - Simple Shop (splash screen → 🛒 Shop): spend banked coins on cosmetic
+ *   pipe skins (Candy Cane, Galaxy, Golden), a Sparkle Trail that follows
+ *   the player while flying, and a permanent Starter Shield Boost perk
+ *   (begin every future run with 2 shields instead of 1). Purchases and
+ *   the equipped skin persist per-device via localStorage.
+ * - index.js now has a permanent header note reminding that editing the
+ *   file (even committing to GitHub) does not update the live Cloudflare
+ *   Worker — it must be manually redeployed (dashboard or wrangler).
  *
  * WHAT CHANGED IN v2.11.00
  * - Coin-buyable revive: if you die with no shield or feather left, and
@@ -101,7 +111,7 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.11.00";
+  const GAME_VERSION = "v2.12.00";
 
   // ===========================================================================
   // 0. CONFIG
@@ -175,6 +185,12 @@ window.addEventListener('DOMContentLoaded', () => {
   const declineReviveBtn = document.getElementById('declineReviveBtn');
   const reviveCoinCost = document.getElementById('reviveCoinCost');
   const reviveCoinBalance = document.getElementById('reviveCoinBalance');
+
+  const shopModal = document.getElementById('shop-modal');
+  const shopBtn = document.getElementById('shopBtn');
+  const closeShopBtn = document.getElementById('closeShopBtn');
+  const shopList = document.getElementById('shopList');
+  const shopCoinBalance = document.getElementById('shopCoinBalance');
 
   // ===========================================================================
   // 2. STATE
@@ -254,6 +270,114 @@ window.addEventListener('DOMContentLoaded', () => {
   let totalCoins = parseInt(localStorage.getItem('pixeljump_total_coins'), 10) || 0;
   let coinsThisRun = 0;
   let personalBest = parseInt(localStorage.getItem(personalBestKey(selectedDifficulty)), 10) || 0;
+
+  // ===========================================================================
+  // SHOP — spend banked coins on cosmetic pipe skins and small perks
+  // ===========================================================================
+  const SHOP_ITEMS = [
+    { id: 'skin_classic', type: 'pipeSkin', name: 'Classic Crystal', icon: '💎', cost: 0,
+      desc: 'The default look — changes with time of day.', palette: null },
+    { id: 'skin_candy', type: 'pipeSkin', name: 'Candy Cane', icon: '🍬', cost: 50,
+      desc: 'Sweet red & white striped pipes.',
+      palette: { pipeColor: '#ef4444', pipeAccent: '#b91c1c', pipeHighlight: '#fecaca', pipeCap: '#ffffff' } },
+    { id: 'skin_galaxy', type: 'pipeSkin', name: 'Galaxy', icon: '🌌', cost: 75,
+      desc: 'Deep-space pipes with starry gold caps.',
+      palette: { pipeColor: '#4c1d95', pipeAccent: '#2e1065', pipeHighlight: '#c4b5fd', pipeCap: '#facc15' } },
+    { id: 'skin_gold', type: 'pipeSkin', name: 'Golden', icon: '🏆', cost: 120,
+      desc: 'All-gold pipes for high rollers.',
+      palette: { pipeColor: '#f59e0b', pipeAccent: '#b45309', pipeHighlight: '#fef3c7', pipeCap: '#fde047' } },
+    { id: 'sparkleTrail', type: 'trail', name: 'Sparkle Trail', icon: '✨', cost: 60,
+      desc: 'Leave a shimmering trail as you fly.' },
+    { id: 'starterShield', type: 'perk', name: 'Starter Shield Boost', icon: '🛡️', cost: 150,
+      desc: 'Begin every future run with 2 shields instead of 1.' },
+  ];
+
+  let ownedItems = JSON.parse(localStorage.getItem('pixeljump_owned_items') || 'null') || ['skin_classic'];
+  if (!ownedItems.includes('skin_classic')) ownedItems.push('skin_classic');
+  let equippedSkin = localStorage.getItem('pixeljump_equipped_skin') || 'skin_classic';
+
+  function saveShopState() {
+    localStorage.setItem('pixeljump_owned_items', JSON.stringify(ownedItems));
+    localStorage.setItem('pixeljump_equipped_skin', equippedSkin);
+  }
+
+  function getActivePipePalette() {
+    const item = SHOP_ITEMS.find(i => i.id === equippedSkin);
+    return (item && item.palette) ? item.palette : currentTheme;
+  }
+
+  function openShop() {
+    renderShopList();
+    if (shopModal) shopModal.classList.remove('hidden');
+  }
+
+  function closeShop() {
+    if (shopModal) shopModal.classList.add('hidden');
+  }
+
+  function renderShopList() {
+    if (shopCoinBalance) shopCoinBalance.textContent = totalCoins.toLocaleString();
+    if (!shopList) return;
+    shopList.innerHTML = '';
+
+    SHOP_ITEMS.forEach(item => {
+      const owned = ownedItems.includes(item.id);
+      const isEquippedSkin = item.type === 'pipeSkin' && equippedSkin === item.id;
+      const affordable = totalCoins >= item.cost;
+
+      const row = document.createElement('div');
+      row.className = `shop-item${owned ? ' owned' : ''}${isEquippedSkin ? ' equipped' : ''}`;
+
+      let actionHtml;
+      if (item.type === 'pipeSkin') {
+        if (isEquippedSkin) {
+          actionHtml = `<button class="shop-item-action equipped-label" disabled>Equipped</button>`;
+        } else if (owned) {
+          actionHtml = `<button class="shop-item-action equip" data-action="equip" data-id="${item.id}">Equip</button>`;
+        } else {
+          actionHtml = `<button class="shop-item-action buy" data-action="buy" data-id="${item.id}" ${affordable ? '' : 'disabled'}>Buy 🪙${item.cost}</button>`;
+        }
+      } else {
+        actionHtml = owned
+          ? `<button class="shop-item-action equipped-label" disabled>Owned</button>`
+          : `<button class="shop-item-action buy" data-action="buy" data-id="${item.id}" ${affordable ? '' : 'disabled'}>Buy 🪙${item.cost}</button>`;
+      }
+
+      row.innerHTML = `
+        <span class="shop-item-icon">${item.icon}</span>
+        <div class="shop-item-info"><strong>${item.name}</strong><span>${item.desc}</span></div>
+        ${actionHtml}`;
+      shopList.appendChild(row);
+    });
+
+    shopList.querySelectorAll('[data-action="buy"]').forEach(btn => {
+      btn.addEventListener('click', () => buyShopItem(btn.dataset.id));
+    });
+    shopList.querySelectorAll('[data-action="equip"]').forEach(btn => {
+      btn.addEventListener('click', () => equipSkin(btn.dataset.id));
+    });
+  }
+
+  function buyShopItem(id) {
+    const item = SHOP_ITEMS.find(i => i.id === id);
+    if (!item || ownedItems.includes(id) || totalCoins < item.cost) return;
+
+    totalCoins -= item.cost;
+    localStorage.setItem('pixeljump_total_coins', String(totalCoins));
+    ownedItems.push(id);
+    if (item.type === 'pipeSkin') equippedSkin = id; // auto-equip a newly bought skin
+    saveShopState();
+    updateCoinBadge();
+    playSound('item');
+    renderShopList();
+  }
+
+  function equipSkin(id) {
+    if (!ownedItems.includes(id)) return;
+    equippedSkin = id;
+    saveShopState();
+    renderShopList();
+  }
 
   let VW = CONFIG.BASE_W;
   let VH = CONFIG.BASE_H;
@@ -655,6 +779,7 @@ window.addEventListener('DOMContentLoaded', () => {
     { icon: '🤏', title: 'Mini Mode', body: 'Shrinks you down to slip through tight gaps!' },
     { icon: '🪶', title: 'Lucky Feather', body: "Saves you from one otherwise-fatal hit. Only holds one at a time!" },
     { icon: '💖', title: 'Coin Revive', body: "Out of shields and feathers? Spend banked coins for one revive per run!" },
+    { icon: '🛒', title: 'Shop', body: "Spend coins on pipe skins, a sparkle trail, or a permanent starter shield boost!" },
     { icon: '🪙', title: 'Coins', body: 'Collect coins to grow your all-time total, shown on the start screen!' },
     { icon: '🎯', title: 'Perfect Run', body: 'Clear pipes with zero pickups for a skill-only streak bonus!' },
     { icon: '🛡️+⚔️', title: "Knight's Rampage", body: 'Smashes 6 pipes in a row for +50 points!' },
@@ -858,6 +983,10 @@ window.addEventListener('DOMContentLoaded', () => {
   if (reviveBtn) reviveBtn.addEventListener('click', performRevive);
   if (declineReviveBtn) declineReviveBtn.addEventListener('click', declineRevive);
 
+  if (shopBtn) shopBtn.addEventListener('click', openShop);
+  if (closeShopBtn) closeShopBtn.addEventListener('click', closeShop);
+  if (shopModal) shopModal.addEventListener('click', (e) => { if (e.target === shopModal) closeShop(); });
+
   muteBtn.addEventListener('click', () => {
     audioMuted = !audioMuted;
     muteBtn.textContent = audioMuted ? '🔇 Audio: Off' : '🔊 Audio: On';
@@ -898,6 +1027,7 @@ window.addEventListener('DOMContentLoaded', () => {
         return;
       }
       if (reviveModalOpen) return; // require an explicit tap on Revive/End Run
+      if (shopModal && !shopModal.classList.contains('hidden')) return;
       if (!gameStarted) {
         startGameBtn.click();
       } else if (gameOver) {
@@ -1130,6 +1260,15 @@ window.addEventListener('DOMContentLoaded', () => {
     player.x = player.cx - player.width / 2;
     player.y = player.cy - player.height / 2;
     if (player.y + player.height >= VH || player.y <= 0) handlePlayerHit();
+
+    if (ownedItems.includes('sparkleTrail') && frameCount % 4 === 0) {
+      particles.push({
+        x: player.x + player.width * 0.2, y: player.y + player.height / 2,
+        vx: -1.2 * SCALE, vy: (Math.random() - 0.5) * 0.6 * SCALE,
+        size: (Math.random() * 4 + 3) * SCALE, color: "#fde047",
+        alpha: 0.75, gravity: 0, rotation: 0, vRot: 0
+      });
+    }
 
     const baseInterval = (slowMoTimer > 0) ? 220 : 110;
     const pipeSpawnInterval = Math.max(preset.intervalFloor, Math.round(baseInterval - difficultyLevel() * preset.intervalRampRate));
@@ -1377,6 +1516,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const w = pipe.width;
     const capH = 20 * SCALE;
     const r = 10 * SCALE;
+    const pal = getActivePipePalette();
 
     const drawShaft = (sx, sy, sh) => {
       if (sh <= 0) return;
@@ -1387,10 +1527,10 @@ window.addEventListener('DOMContentLoaded', () => {
         grad.addColorStop(0.62, "#fef3c7");
         grad.addColorStop(1, "#f59e0b");
       } else {
-        grad.addColorStop(0, currentTheme.pipeAccent);
-        grad.addColorStop(0.45, currentTheme.pipeColor);
-        grad.addColorStop(0.62, currentTheme.pipeHighlight);
-        grad.addColorStop(1, currentTheme.pipeColor);
+        grad.addColorStop(0, pal.pipeAccent);
+        grad.addColorStop(0.45, pal.pipeColor);
+        grad.addColorStop(0.62, pal.pipeHighlight);
+        grad.addColorStop(1, pal.pipeColor);
       }
       ctx.fillStyle = grad;
       pathRoundRect(sx, sy, w, sh, r);
@@ -1423,13 +1563,13 @@ window.addEventListener('DOMContentLoaded', () => {
     // Gem caps facing the gap, with a soft glow, instead of a flat lip
     const drawCap = (capY) => {
       ctx.save();
-      ctx.shadowColor = pipe.golden ? "#fde047" : currentTheme.pipeCap;
+      ctx.shadowColor = pipe.golden ? "#fde047" : pal.pipeCap;
       ctx.shadowBlur = (pipe.golden ? 16 : 10) * SCALE;
-      ctx.fillStyle = pipe.golden ? "#b45309" : currentTheme.pipeAccent;
+      ctx.fillStyle = pipe.golden ? "#b45309" : pal.pipeAccent;
       pathRoundRect(pipe.x - 5 * SCALE, capY, w + 10 * SCALE, capH, capH / 2);
       ctx.fill();
       ctx.shadowBlur = 0;
-      ctx.fillStyle = pipe.golden ? "#fde047" : currentTheme.pipeCap;
+      ctx.fillStyle = pipe.golden ? "#fde047" : pal.pipeCap;
       ctx.beginPath();
       ctx.arc(pipe.x + w / 2, capY + capH / 2, 6 * SCALE, 0, Math.PI * 2);
       ctx.fill();
@@ -1846,7 +1986,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function resetGame() {
     player.cy = VH * 0.4 + player.baseHeight / 2;
     player.vy = 0;
-    player.shieldCount = 1;
+    player.shieldCount = ownedItems.includes('starterShield') ? 2 : 1;
     player.inventory.sword = false;
     player.inventory.swordCharges = 0;
     giantShield.active = false;

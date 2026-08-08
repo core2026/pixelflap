@@ -1,6 +1,6 @@
 /* =========================================================================
    PixelJump Stylesheet
-   Version: v2.6.0
+   Version: v2.7.0
 
    AI / DEVELOPER EDITING REQUIREMENT:
    Any assistant or developer who edits this file MUST bump the version
@@ -520,6 +520,57 @@ input[type="text"].invalid {
   opacity: 0.6;
   text-align: center;
 }
+
+/* -------------------------------------------------------------------------
+   Shop
+------------------------------------------------------------------------- */
+.shop-content { gap: 10px; }
+
+.shop-list {
+  width: 100%;
+  max-height: 340px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.shop-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff7e0;
+  border: 2px solid var(--card-border);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+
+.shop-item.owned { background: #f0fdf4; border-color: var(--grass-green); }
+.shop-item.equipped { border-color: var(--candy-pink); box-shadow: 0 0 0 3px rgba(255, 111, 165, 0.25); }
+
+.shop-item-icon { font-size: 1.6rem; flex: 0 0 auto; }
+
+.shop-item-info { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.shop-item-info strong { color: var(--ink); font-size: 0.85rem; }
+.shop-item-info span { color: var(--ink); opacity: 0.7; font-size: 0.7rem; }
+
+.shop-item-action {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.shop-item-action.buy { background: linear-gradient(180deg, var(--candy-pink), #ff4f91); color: #fff; }
+.shop-item-action.buy:disabled { background: #d1d5db; color: #6b7280; cursor: not-allowed; }
+.shop-item-action.equip { background: #fff; color: var(--grape-purple); border: 2px solid var(--card-border); }
+.shop-item-action.equipped-label { background: var(--grass-green); color: #fff; cursor: default; }
 
 .tutorial-canvas {
   width: 100%;
