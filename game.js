@@ -1,7 +1,13 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.9.00
+ * Version: v2.10.00
+ *
+ * WHAT CHANGED IN v2.10.00
+ * - Slow-mo "kill cam": when a run ends with a new personal best, the death
+ *   frame freezes for a beat while a confetti burst and a bouncy "NEW BEST!"
+ *   callout play, before the game-over screen reveals. Regular (non-best)
+ *   deaths go straight to the game-over screen as before.
  *
  * WHAT CHANGED IN v2.9.00
  * - "How to Play" is now an animated, click-to-open tutorial instead of a
@@ -86,7 +92,7 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.9.00";
+  const GAME_VERSION = "v2.10.00";
 
   // ===========================================================================
   // 0. CONFIG
@@ -210,6 +216,15 @@ window.addEventListener('DOMContentLoaded', () => {
   // Faint motion-line particles that kick in as the pipe speed ramps up, so
   // the game visually communicates "getting faster" beyond just the numbers.
   let windStreaks = [];
+
+  // Slow-mo "kill cam": when a run ends with a new personal best, gameplay
+  // freezes on the death frame for a beat while a celebration plays, before
+  // the game-over screen reveals. Frozen automatically since update() stops
+  // moving pipes/items/player the instant gameOver is set.
+  const KILL_CAM_DURATION = 100; // frames (~1.6s)
+  let killCamActive = false;
+  let killCamTimer = 0;
+  let killCamParticles = [];
 
   // Persistent, per-device progress (localStorage — see note in chat about
   // this not syncing across devices without a real account system).
@@ -1014,6 +1029,20 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function update() {
+    if (killCamActive) {
+      killCamTimer--;
+      killCamParticles.forEach(p => {
+        p.x += p.vx; p.y += p.vy;
+        p.vy += 0.12 * SCALE;
+        p.rotation += p.vRot;
+        if (killCamTimer < 30) p.alpha = Math.max(0, killCamTimer / 30);
+      });
+      if (killCamTimer <= 0) {
+        killCamActive = false;
+        revealGameOverScreen(true);
+      }
+      return;
+    }
     if (!gameStarted || gameOver || !infoModal.classList.contains('hidden')) return;
     frameCount++;
 
@@ -1605,6 +1634,55 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.fillStyle = "#22d3ee";
       ctx.fillText(`🎯 Perfect Streak: ${perfectRunStreak}`, pad, hudY);
     }
+
+    if (killCamActive) drawKillCamOverlay();
+  }
+
+  // Celebration overlay drawn on top of the frozen death frame when a run
+  // ends with a new personal best. Progress 0→1 over KILL_CAM_DURATION.
+  function drawKillCamOverlay() {
+    const progress = 1 - Math.max(0, killCamTimer) / KILL_CAM_DURATION;
+    const fadeOut = killCamTimer < 30 ? killCamTimer / 30 : 1;
+
+    // Darkened vignette so the celebration text pops
+    ctx.save();
+    ctx.fillStyle = `rgba(10, 8, 30, ${0.42 * fadeOut})`;
+    ctx.fillRect(0, 0, VW, VH);
+    ctx.restore();
+
+    // Confetti burst
+    killCamParticles.forEach(p => {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.alpha);
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+      ctx.restore();
+    });
+
+    // Elastic pop-in for the headline: overshoots past 1 then settles
+    const popT = Math.min(1, progress / 0.35);
+    const scalePop = popT < 1
+      ? 0.4 + 0.9 * (1 - Math.pow(1 - popT, 3)) + Math.sin(popT * Math.PI) * 0.15
+      : 1;
+
+    ctx.save();
+    ctx.globalAlpha = fadeOut;
+    ctx.translate(VW / 2, VH * 0.38);
+    ctx.scale(scalePop, scalePop);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `800 ${30 * SCALE}px 'Baloo 2', sans-serif`;
+    ctx.fillStyle = "#fde047";
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = 8 * SCALE;
+    ctx.fillText("🎉 NEW BEST! 🎉", 0, 0);
+    ctx.shadowBlur = 0;
+    ctx.font = `700 ${22 * SCALE}px 'Baloo 2', sans-serif`;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(`${score} pts`, 0, 42 * SCALE);
+    ctx.restore();
   }
 
   // ===========================================================================
@@ -1635,13 +1713,44 @@ window.addEventListener('DOMContentLoaded', () => {
         isNewBest = true;
       }
 
-      finalScoreEl.textContent = `Score (${playerInitials || "---"}): ${score} pts — ${difficultyLabel(selectedDifficulty)}`;
-      renderStatsPanel(isNewBest);
-      showScreen('gameover');
-      gameContainer.classList.add('shake');
-      setTimeout(() => gameContainer.classList.remove('shake'), 300);
-      await submitHighScore(score);
+      if (isNewBest) {
+        startKillCam();
+      } else {
+        await revealGameOverScreen(false);
+      }
     }
+  }
+
+  function startKillCam() {
+    killCamActive = true;
+    killCamTimer = KILL_CAM_DURATION;
+    playSound('item');
+
+    // Confetti burst from screen center — animated independently of the
+    // (now frozen) main particle system during the celebration.
+    killCamParticles = [];
+    const cx = VW / 2, cy = VH * 0.4;
+    const colors = ["#facc15", "#f97316", "#38bdf8", "#c084fc", "#52d17c", "#ff6fa5"];
+    for (let i = 0; i < 46; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = (Math.random() * 4 + 2) * SCALE;
+      killCamParticles.push({
+        x: cx, y: cy,
+        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 2 * SCALE,
+        size: (Math.random() * 5 + 3) * SCALE,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        alpha: 1, rotation: Math.random() * Math.PI * 2, vRot: (Math.random() - 0.5) * 0.3
+      });
+    }
+  }
+
+  async function revealGameOverScreen(isNewBest) {
+    finalScoreEl.textContent = `Score (${playerInitials || "---"}): ${score} pts — ${difficultyLabel(selectedDifficulty)}`;
+    renderStatsPanel(isNewBest);
+    showScreen('gameover');
+    gameContainer.classList.add('shake');
+    setTimeout(() => gameContainer.classList.remove('shake'), 300);
+    await submitHighScore(score);
   }
 
   function updateCoinBadge() {
@@ -1683,6 +1792,9 @@ window.addEventListener('DOMContentLoaded', () => {
     pipesClearedThisRun = 0;
     coinsThisRun = 0;
     windStreaks = [];
+    killCamActive = false;
+    killCamTimer = 0;
+    killCamParticles = [];
     mercyMessagePending = isMercyActive();
     score = 0;
     pipes = [];
