@@ -1,7 +1,15 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.13.00
+ * Version: v2.13.01
+ *
+ * WHAT CHANGED IN v2.13.01
+ * - The coin emoji (🪙) was also rendering unreliably (as an unrelated
+ *   glyph) in plain HTML on some systems, not just in canvas text. Replaced
+ *   every remaining usage — the splash screen coin badge, the game-over
+ *   stats panel, the revive prompt, and the Shop's coin balance/buy buttons
+ *   — with a small reusable inline SVG coin icon that renders identically
+ *   everywhere, instead of depending on any emoji font.
  *
  * WHAT CHANGED IN v2.13.00
  * - Fixed a real gap where "Play Again" restarted background music without
@@ -130,7 +138,7 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.13.00";
+  const GAME_VERSION = "v2.13.01";
 
   // ===========================================================================
   // 0. CONFIG
@@ -335,6 +343,8 @@ window.addEventListener('DOMContentLoaded', () => {
     if (shopModal) shopModal.classList.add('hidden');
   }
 
+  const COIN_ICON_SVG = `<svg class="coin-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#ffd54f" stroke="#a86c05" stroke-width="2"/><text x="12" y="16.5" text-anchor="middle" font-size="12" font-weight="800" fill="#a86c05" font-family="'Baloo 2', sans-serif">$</text></svg>`;
+
   function renderShopList() {
     if (shopCoinBalance) shopCoinBalance.textContent = totalCoins.toLocaleString();
     if (!shopList) return;
@@ -355,12 +365,12 @@ window.addEventListener('DOMContentLoaded', () => {
         } else if (owned) {
           actionHtml = `<button class="shop-item-action equip" data-action="equip" data-id="${item.id}">Equip</button>`;
         } else {
-          actionHtml = `<button class="shop-item-action buy" data-action="buy" data-id="${item.id}" ${affordable ? '' : 'disabled'}>Buy 🪙${item.cost}</button>`;
+          actionHtml = `<button class="shop-item-action buy" data-action="buy" data-id="${item.id}" ${affordable ? '' : 'disabled'}>Buy ${COIN_ICON_SVG}${item.cost}</button>`;
         }
       } else {
         actionHtml = owned
           ? `<button class="shop-item-action equipped-label" disabled>Owned</button>`
-          : `<button class="shop-item-action buy" data-action="buy" data-id="${item.id}" ${affordable ? '' : 'disabled'}>Buy 🪙${item.cost}</button>`;
+          : `<button class="shop-item-action buy" data-action="buy" data-id="${item.id}" ${affordable ? '' : 'disabled'}>Buy ${COIN_ICON_SVG}${item.cost}</button>`;
       }
 
       row.innerHTML = `

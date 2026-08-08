@@ -1,6 +1,6 @@
 /* =========================================================================
    PixelJump Stylesheet
-   Version: v2.7.0
+   Version: v2.8.0
 
    AI / DEVELOPER EDITING REQUIREMENT:
    Any assistant or developer who edits this file MUST bump the version
@@ -643,6 +643,15 @@ input[type="text"].invalid {
   padding: 6px 18px;
   box-shadow: var(--shadow-soft);
   margin-top: -4px;
+}
+
+/* Reusable inline gold-coin SVG icon — used instead of the 🪙 emoji, which
+   doesn't render reliably as text across every platform/browser. */
+.coin-icon {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  display: inline-block;
 }
 
 /* -------------------------------------------------------------------------
