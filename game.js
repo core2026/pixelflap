@@ -1,7 +1,14 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v3.0.00
+ * Version: v3.0.01
+ *
+ * WHAT CHANGED IN v3.0.01
+ * - Fixed the "Add to Home Screen" banner covering the Start Game button
+ *   on iPhone. It was a fixed/floating overlay pinned to the bottom of the
+ *   screen; moved it into the normal splash-content layout instead (right
+ *   below the title), so it now pushes other elements down rather than
+ *   floating on top of them — can't overlap any button on any screen size.
  *
  * WHAT CHANGED IN v3.0.00
  * - PWA support: PixelJump can now be installed to the home screen as a
@@ -57,7 +64,7 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v3.0.00";
+  const GAME_VERSION = "v3.0.01";
 
   // ===========================================================================
   // 0. CONFIG

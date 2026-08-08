@@ -1,6 +1,6 @@
 /* =========================================================================
    PixelJump Stylesheet
-   Version: v2.9.0
+   Version: v2.9.1
 
    AI / DEVELOPER EDITING REQUIREMENT:
    Any assistant or developer who edits this file MUST bump the version
@@ -655,15 +655,12 @@ input[type="text"].invalid {
 }
 
 /* -------------------------------------------------------------------------
-   "Add to Home Screen" install banner — fixed to the bottom, above any
-   safe-area inset (home indicator / gesture bar).
+   "Add to Home Screen" install banner — lives in the normal splash-content
+   flex flow (NOT fixed/floating), so it simply pushes other elements down
+   instead of ever covering buttons like Start Game on small screens.
 ------------------------------------------------------------------------- */
 .install-banner {
-  position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: max(12px, var(--safe-bottom));
-  z-index: 30;
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -672,7 +669,7 @@ input[type="text"].invalid {
   border-radius: 16px;
   padding: 10px 12px;
   box-shadow: var(--shadow-soft);
-  animation: slideUp 0.3s ease;
+  animation: fadeIn 0.3s ease;
 }
 
 .install-banner-text {
@@ -681,6 +678,7 @@ input[type="text"].invalid {
   font-weight: 700;
   color: var(--ink);
   line-height: 1.3;
+  text-align: left;
 }
 
 .install-cta {
@@ -705,11 +703,6 @@ input[type="text"].invalid {
   font-size: 1rem;
   cursor: pointer;
   padding: 4px;
-}
-
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
 }
 
 /* -------------------------------------------------------------------------

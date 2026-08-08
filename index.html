@@ -14,7 +14,7 @@
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#3fc7ff">
   <meta name="description" content="PixelJump - a bright, bouncy flap-and-dodge adventure for kids!">
-  <title>PixelJump - v3.0.00</title>
+  <title>PixelJump - v3.0.01</title>
 
   <!--
     =====================================================================
@@ -57,7 +57,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css?v=2.9.0">
+  <link rel="stylesheet" href="style.css?v=2.9.1">
 </head>
 <body>
 
@@ -91,6 +91,18 @@
       <div class="splash-content">
         <h1 class="title" id="splashTitle">PIXEL JUMP</h1>
         <p class="subtitle">Flap, dodge &amp; collect your way to the top!</p>
+
+        <!-- "Add to Home Screen" banner. Hidden by default; game.js decides
+             whether/how to show it (native install button on Android/
+             Chrome, manual Share-sheet instructions on iOS, nothing if
+             already installed or previously dismissed). Lives in the
+             normal page flow (not fixed/floating) so it can never cover
+             other buttons on small screens. -->
+        <div id="installBanner" class="install-banner hidden" role="status">
+          <span id="installBannerText" class="install-banner-text"></span>
+          <button type="button" class="install-cta hidden" id="installBannerBtn">Install</button>
+          <button type="button" class="install-close" id="installBannerClose" aria-label="Dismiss">✕</button>
+        </div>
 
         <!-- Persistent coin total, saved on this device via localStorage
              (see game.js -> totalCoins). Updated after every run. -->
@@ -266,15 +278,5 @@
   <!-- Hidden native file input used for uploading a custom avatar photo -->
   <input type="file" id="avatarUpload" accept="image/*" aria-hidden="true">
 
-  <!-- "Add to Home Screen" banner. Hidden by default; game.js decides
-       whether/how to show it (native install button on Android/Chrome,
-       manual Share-sheet instructions on iOS, nothing if already
-       installed or previously dismissed). -->
-  <div id="installBanner" class="install-banner hidden" role="status">
-    <span id="installBannerText" class="install-banner-text"></span>
-    <button type="button" class="install-cta hidden" id="installBannerBtn">Install</button>
-    <button type="button" class="install-close" id="installBannerClose" aria-label="Dismiss">✕</button>
-  </div>
-
-<script src="game.js?v=3.0.00"></script></body>
+<script src="game.js?v=3.0.01"></script></body>
 </html>
