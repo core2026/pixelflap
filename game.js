@@ -1,7 +1,16 @@
 /**
  * =============================================================================
  * PixelJump Engine
- * Version: v2.10.00
+ * Version: v2.11.00
+ *
+ * WHAT CHANGED IN v2.11.00
+ * - Coin-buyable revive: if you die with no shield or feather left, and
+ *   have at least 20 banked coins, you're offered one revive per run —
+ *   spend the coins to keep flying (with a brief grace shield so momentum
+ *   doesn't carry you straight back into the same pipe), or end the run.
+ * - Fixed: pressing Space/Up (or tapping) during the new-personal-best
+ *   kill-cam no longer skips straight to "Play Again" — it now fast-forwards
+ *   the celebration instead, like tapping through a cutscene.
  *
  * WHAT CHANGED IN v2.10.00
  * - Slow-mo "kill cam": when a run ends with a new personal best, the death
@@ -92,7 +101,7 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-  const GAME_VERSION = "v2.10.00";
+  const GAME_VERSION = "v2.11.00";
 
   // ===========================================================================
   // 0. CONFIG
@@ -161,6 +170,12 @@ window.addEventListener('DOMContentLoaded', () => {
   const homeBtn = document.getElementById('homeBtn');
   const playAgainBtn = document.getElementById('playAgainBtn');
 
+  const reviveModal = document.getElementById('revive-modal');
+  const reviveBtn = document.getElementById('reviveBtn');
+  const declineReviveBtn = document.getElementById('declineReviveBtn');
+  const reviveCoinCost = document.getElementById('reviveCoinCost');
+  const reviveCoinBalance = document.getElementById('reviveCoinBalance');
+
   // ===========================================================================
   // 2. STATE
   // ===========================================================================
@@ -225,6 +240,14 @@ window.addEventListener('DOMContentLoaded', () => {
   let killCamActive = false;
   let killCamTimer = 0;
   let killCamParticles = [];
+
+  // Coin-buyable revive: once per run, if the player has no shield/feather
+  // left and enough coins banked, offer to spend coins to keep flying
+  // instead of ending the run outright.
+  const REVIVE_COST = 20;
+  let reviveModalOpen = false;
+  let coinReviveUsedThisRun = false;
+  let pendingRevivePipe = null;
 
   // Persistent, per-device progress (localStorage — see note in chat about
   // this not syncing across devices without a real account system).
@@ -631,6 +654,7 @@ window.addEventListener('DOMContentLoaded', () => {
     { icon: '🧲', title: 'Magnet', body: 'Pulls nearby coins and power-ups straight to you!' },
     { icon: '🤏', title: 'Mini Mode', body: 'Shrinks you down to slip through tight gaps!' },
     { icon: '🪶', title: 'Lucky Feather', body: "Saves you from one otherwise-fatal hit. Only holds one at a time!" },
+    { icon: '💖', title: 'Coin Revive', body: "Out of shields and feathers? Spend banked coins for one revive per run!" },
     { icon: '🪙', title: 'Coins', body: 'Collect coins to grow your all-time total, shown on the start screen!' },
     { icon: '🎯', title: 'Perfect Run', body: 'Clear pipes with zero pickups for a skill-only streak bonus!' },
     { icon: '🛡️+⚔️', title: "Knight's Rampage", body: 'Smashes 6 pipes in a row for +50 points!' },
@@ -831,6 +855,9 @@ window.addEventListener('DOMContentLoaded', () => {
   if (tutorialPrevBtn) tutorialPrevBtn.addEventListener('click', () => goToTutorialStep(tutorialIndex - 1));
   if (tutorialNextBtn) tutorialNextBtn.addEventListener('click', () => goToTutorialStep(tutorialIndex + 1));
 
+  if (reviveBtn) reviveBtn.addEventListener('click', performRevive);
+  if (declineReviveBtn) declineReviveBtn.addEventListener('click', declineRevive);
+
   muteBtn.addEventListener('click', () => {
     audioMuted = !audioMuted;
     muteBtn.textContent = audioMuted ? '🔇 Audio: Off' : '🔊 Audio: On';
@@ -862,10 +889,15 @@ window.addEventListener('DOMContentLoaded', () => {
 
     if (e.code === 'Space' || e.code === 'ArrowUp') {
       e.preventDefault();
+      if (killCamActive) {
+        killCamTimer = 0; // tap-to-skip the celebration, same as a cutscene
+        return;
+      }
       if (!infoModal.classList.contains('hidden')) {
         closeTutorial();
         return;
       }
+      if (reviveModalOpen) return; // require an explicit tap on Revive/End Run
       if (!gameStarted) {
         startGameBtn.click();
       } else if (gameOver) {
@@ -879,6 +911,8 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   function handleJumpInput(e) {
+    if (killCamActive) { killCamTimer = 0; return; }
+    if (reviveModalOpen) return;
     if (!gameStarted || gameOver) return;
     e.preventDefault();
     initAudio();
@@ -1043,7 +1077,7 @@ window.addEventListener('DOMContentLoaded', () => {
       }
       return;
     }
-    if (!gameStarted || gameOver || !infoModal.classList.contains('hidden')) return;
+    if (!gameStarted || gameOver || reviveModalOpen || !infoModal.classList.contains('hidden')) return;
     frameCount++;
 
     if (slowMoTimer > 0) slowMoTimer--;
@@ -1256,9 +1290,49 @@ window.addEventListener('DOMContentLoaded', () => {
       }
       player.vy = player.jumpStrength * 1.3;
       spawnFloatingText("🪶 SAVED BY THE FEATHER!", player.x - 20, player.y - 20, "#fde68a");
+    } else if (!coinReviveUsedThisRun && totalCoins >= REVIVE_COST) {
+      offerRevive(pipe);
     } else {
       endGame();
     }
+  }
+
+  function offerRevive(pipe) {
+    pendingRevivePipe = pipe;
+    reviveModalOpen = true;
+    if (reviveCoinCost) reviveCoinCost.textContent = REVIVE_COST;
+    if (reviveCoinBalance) reviveCoinBalance.textContent = totalCoins.toLocaleString();
+    if (reviveModal) reviveModal.classList.remove('hidden');
+    playSound('shatter');
+  }
+
+  function performRevive() {
+    totalCoins -= REVIVE_COST;
+    localStorage.setItem('pixeljump_total_coins', String(totalCoins));
+    updateCoinBadge();
+    coinReviveUsedThisRun = true;
+    reviveModalOpen = false;
+    if (reviveModal) reviveModal.classList.add('hidden');
+
+    if (pendingRevivePipe) {
+      pendingRevivePipe.shattered = true;
+      createPipeShatterParticles(pendingRevivePipe.x, 0, pendingRevivePipe.width, pendingRevivePipe.topHeight);
+      createPipeShatterParticles(pendingRevivePipe.x, pendingRevivePipe.bottomY, pendingRevivePipe.width, VH - pendingRevivePipe.bottomY);
+    }
+    pendingRevivePipe = null;
+
+    // Grace shield so momentum doesn't carry them straight back into danger
+    player.shieldCount = Math.max(player.shieldCount, 1);
+    player.vy = player.jumpStrength * 1.3;
+    playSound('item');
+    spawnFloatingText("💖 REVIVED!", player.x - 20, player.y - 20, "#ff6fa5");
+  }
+
+  function declineRevive() {
+    reviveModalOpen = false;
+    pendingRevivePipe = null;
+    if (reviveModal) reviveModal.classList.add('hidden');
+    endGame();
   }
 
   // ===========================================================================
@@ -1762,7 +1836,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (statPipesEl) statPipesEl.textContent = pipesClearedThisRun;
     if (statSwordStreakEl) statSwordStreakEl.textContent = bestSwordStreak;
     if (statGrazeStreakEl) statGrazeStreakEl.textContent = bestGrazeStreak;
-    if (statCoinsEl) statCoinsEl.textContent = `+${coinsThisRun} (Total: ${totalCoins.toLocaleString()})`;
+    if (statCoinsEl) statCoinsEl.textContent = `+${coinsThisRun} (Total: ${totalCoins.toLocaleString()})${coinReviveUsedThisRun ? ' · 💖 Revived' : ''}`;
     if (statPerfectStreakEl) statPerfectStreakEl.textContent = bestPerfectStreak;
     const rampReached = Math.min(pipesClearedThisRun, DIFFICULTY_CAP);
     if (statRampLabelEl) statRampLabelEl.textContent = `${rampReached}/${DIFFICULTY_CAP}`;
@@ -1795,6 +1869,10 @@ window.addEventListener('DOMContentLoaded', () => {
     killCamActive = false;
     killCamTimer = 0;
     killCamParticles = [];
+    reviveModalOpen = false;
+    coinReviveUsedThisRun = false;
+    pendingRevivePipe = null;
+    if (reviveModal) reviveModal.classList.add('hidden');
     mercyMessagePending = isMercyActive();
     score = 0;
     pipes = [];

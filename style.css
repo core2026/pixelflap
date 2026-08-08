@@ -1,6 +1,6 @@
 /* =========================================================================
    PixelJump Stylesheet
-   Version: v2.5.0
+   Version: v2.6.0
 
    AI / DEVELOPER EDITING REQUIREMENT:
    Any assistant or developer who edits this file MUST bump the version
@@ -472,6 +472,53 @@ input[type="text"].invalid {
   color: var(--grape-purple);
   text-align: center;
   margin-bottom: 14px;
+}
+
+/* -------------------------------------------------------------------------
+   Coin-buyable revive prompt
+------------------------------------------------------------------------- */
+#revive-modal { z-index: 25; background: rgba(20, 10, 30, 0.6); backdrop-filter: blur(6px); }
+
+.revive-content { gap: 12px; }
+
+.revive-text {
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+}
+
+.revive-coin-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.revive-cost-badge {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: #7c4a03;
+  background: linear-gradient(180deg, #fef3c7, #fde68a);
+  border: 3px solid #f59e0b;
+  border-radius: 999px;
+  padding: 6px 22px;
+}
+
+.revive-balance {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink);
+  opacity: 0.75;
+}
+
+.revive-hint {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ink);
+  opacity: 0.6;
+  text-align: center;
 }
 
 .tutorial-canvas {

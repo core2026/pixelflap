@@ -14,7 +14,7 @@
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#3fc7ff">
   <meta name="description" content="PixelJump - a bright, bouncy flap-and-dodge adventure for kids!">
-  <title>PixelJump - v2.10.00</title>
+  <title>PixelJump - v2.11.00</title>
 
   <!--
     =====================================================================
@@ -46,7 +46,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css?v=2.5.0">
+  <link rel="stylesheet" href="style.css?v=2.6.0">
 </head>
 <body>
 
@@ -204,10 +204,32 @@
       </div>
     </section>
 
+    <!-- ============================================================
+         COIN-BUYABLE REVIVE PROMPT
+         Only shown mid-run when the player has just died, has no
+         shield/feather left, and has enough coins banked to afford a
+         revive (see game.js -> offerRevive). Capped at one use per run.
+    ============================================================= -->
+    <section id="revive-modal" class="overlay hidden" aria-label="Revive with coins">
+      <div class="splash-content modal-content revive-content">
+        <h2 class="modal-title">💔 You Crashed!</h2>
+        <p class="revive-text">Spend coins to keep flying?</p>
+        <div class="revive-coin-row">
+          <span class="revive-cost-badge">🪙 <span id="reviveCoinCost">20</span></span>
+          <span class="revive-balance">You have <span id="reviveCoinBalance">0</span> 🪙</span>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn secondary-btn" id="declineReviveBtn">❌ End Run</button>
+          <button type="button" class="btn primary-btn bounce-hover" id="reviveBtn">💖 Revive</button>
+        </div>
+        <p class="revive-hint">One coin-revive per run — choose wisely!</p>
+      </div>
+    </section>
+
   </div>
 
   <!-- Hidden native file input used for uploading a custom avatar photo -->
   <input type="file" id="avatarUpload" accept="image/*" aria-hidden="true">
 
-<script src="game.js?v=2.10.00"></script></body>
+<script src="game.js?v=2.11.00"></script></body>
 </html>
